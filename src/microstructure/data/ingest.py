@@ -56,6 +56,7 @@ def ingest_agg_trades(zip_path: Path, out_dir: Path) -> Path:
             pl.col("qty").cast(pl.Float64),
         )
         .select("agg_trade_id", "price", "qty", "first_trade_id", "last_trade_id", "ts", "is_buyer_maker")
+        .sort("agg_trade_id")
     )
     dest = out_dir / (zip_path.stem + ".parquet")
     out.write_parquet(dest)
@@ -75,6 +76,7 @@ def ingest_book_ticker(zip_path: Path, out_dir: Path) -> Path:
             pl.col("ask_qty").cast(pl.Float64),
         )
         .select("update_id", "bid_price", "bid_qty", "ask_price", "ask_qty", "ts")
+        .sort("update_id")
     )
     dest = out_dir / (zip_path.stem + ".parquet")
     out.write_parquet(dest)

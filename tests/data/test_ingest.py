@@ -87,3 +87,32 @@ def test_multi_member_zip_raises(tmp_path: Path):
         zf.writestr("b.csv", "data2\n")
     with pytest.raises(ValueError):
         ingest_agg_trades(z, tmp_path)
+
+
+def test_agg_trades_output_sorted_by_agg_trade_id_despite_shuffled_input(tmp_path: Path):
+    """Exchange-sequence order (agg_trade_id, monotone in time) must hold
+    regardless of the row order in the source CSV."""
+    shuffled_rows = [
+        "103,50002.0,0.040,206,207,1687392001000,true",
+        "100,50000.5,0.010,200,201,1687392000123,true",
+        "102,50001.5,0.030,204,205,1687392000789,true",
+        "101,50000.0,0.020,202,204,1687392000456,false",
+    ]
+    z = _zip_csv(tmp_path / "shuffled", "shuffled.csv", shuffled_rows)
+    df = pl.read_parquet(ingest_agg_trades(z, tmp_path))
+    assert df["agg_trade_id"].to_list() == [100, 101, 102, 103]
+    assert df["ts"].is_sorted()
+
+
+def test_book_ticker_output_sorted_by_update_id_despite_shuffled_input(tmp_path: Path):
+    """Exchange-sequence order (update_id, monotone in time) must hold
+    regardless of the row order in the source CSV."""
+    shuffled_rows = [
+        "9003,50000.1,1.0,50000.3,1.0,1687392001000,1687392001002",
+        "9001,49999.9,1.5,50000.1,2.0,1687392000123,1687392000125",
+        "9002,50000.0,1.2,50000.2,1.1,1687392000500,1687392000502",
+    ]
+    z = _zip_csv(tmp_path / "bt_shuffled", "bt_shuffled.csv", shuffled_rows)
+    df = pl.read_parquet(ingest_book_ticker(z, tmp_path))
+    assert df["update_id"].to_list() == [9001, 9002, 9003]
+    assert df["ts"].is_sorted()
