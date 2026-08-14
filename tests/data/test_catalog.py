@@ -2,8 +2,10 @@ import hashlib
 import io
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 import httpx
+import pytest
 import polars as pl
 
 from microstructure.data.catalog import integrity_report, parquet_path, sync
@@ -54,3 +56,26 @@ def test_integrity_report_flags_missing(tmp_data_dir: Path):
     rep = integrity_report(tmp_data_dir, "BTCUSDT", "aggTrades", "2023-06", "2023-07")
     assert rep["present"].to_list() == [True, False]
     assert rep["rows"].to_list() == [1, None]
+
+
+def test_sync_rejects_corrupt_ingest_output(tmp_data_dir: Path):
+    """Verify that sync validates parquet before canonical rename and fails cleanly."""
+    def bad_ingester(zip_path: Path, out_dir: Path) -> Path:
+        # Write garbage bytes to the expected parquet filename
+        produced = out_dir / "2023-06.parquet"
+        produced.write_bytes(b"garbage data")
+        return produced
+
+    client = make_client()
+    with patch("microstructure.data.catalog._INGESTERS", {"aggTrades": bad_ingester}):
+        with pytest.raises(Exception):  # Should raise on parquet validation failure
+            sync(tmp_data_dir, "BTCUSDT", "aggTrades", "2023-06", "2023-06", client=client)
+        # Verify canonical dest path does not exist
+        dest = parquet_path(tmp_data_dir, "BTCUSDT", "aggTrades", "2023-06")
+        assert not dest.exists()
+
+
+def test_sync_unknown_data_type_raises_value_error(tmp_data_dir: Path):
+    """Verify that sync raises ValueError for unknown data_type."""
+    with pytest.raises(ValueError, match="unknown data_type"):
+        sync(tmp_data_dir, "BTCUSDT", "nope", "2023-06", "2023-06")

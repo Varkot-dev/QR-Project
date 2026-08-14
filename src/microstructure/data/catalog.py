@@ -6,7 +6,7 @@ from pathlib import Path
 import httpx
 import polars as pl
 
-from microstructure.data.binance import DumpFile, download, month_files
+from microstructure.data.binance import download, month_files
 from microstructure.data.ingest import ingest_agg_trades, ingest_book_ticker
 
 _INGESTERS = {"aggTrades": ingest_agg_trades, "bookTicker": ingest_book_ticker}
@@ -21,6 +21,10 @@ def sync(
     client: httpx.Client | None = None,
 ) -> list[Path]:
     """Ensure Parquet exists for every month in [start, end]; return the paths."""
+    if data_type not in _INGESTERS:
+        raise ValueError(
+            f"unknown data_type {data_type!r}; expected one of {sorted(_INGESTERS)}"
+        )
     ingest = _INGESTERS[data_type]
     raw_dir = root / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
@@ -31,6 +35,16 @@ def sync(
             dest.parent.mkdir(parents=True, exist_ok=True)
             zip_path = download(f, raw_dir, client=client)
             produced = ingest(zip_path, dest.parent)
+            # Verify parquet is valid before canonical rename: existence == validity
+            # only because nothing reaches the canonical path unverified.
+            try:
+                pl.scan_parquet(produced).select(pl.len()).collect()
+            except Exception as e:
+                produced.unlink()
+                raise ValueError(
+                    f"Parquet verification failed for {produced}. "
+                    f"File was unlinked. Please re-run sync. Error: {e}"
+                ) from e
             produced.rename(dest)
             zip_path.unlink()
         out.append(dest)
