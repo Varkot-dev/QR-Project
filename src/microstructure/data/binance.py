@@ -5,8 +5,12 @@ https://data.binance.vision/data/futures/um/monthly/{dataType}/{SYMBOL}/{SYMBOL}
 """
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
+from pathlib import Path
+
+import httpx
 
 BASE = "https://data.binance.vision/data/futures/um/monthly"
 _MONTH_RE = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
@@ -45,3 +49,49 @@ def month_files(symbol: str, data_type: str, start: str, end: str) -> list[DumpF
         if mo == 13:
             y, mo = y + 1, 1
     return out
+
+
+class ChecksumError(RuntimeError):
+    """Downloaded file does not match Binance's published SHA-256."""
+
+
+def _sha256(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _fetch_expected_sha(file: DumpFile, client: httpx.Client) -> str:
+    resp = client.get(file.checksum_url)
+    resp.raise_for_status()
+    return resp.text.split()[0].lower()
+
+
+def download(file: DumpFile, dest_dir: Path, client: httpx.Client | None = None) -> Path:
+    """Download file.url into dest_dir, verifying the published SHA-256.
+
+    Cached files that still verify are not re-downloaded.
+    """
+    owns_client = client is None
+    client = client or httpx.Client(timeout=120)
+    try:
+        dest = dest_dir / file.filename
+        expected = _fetch_expected_sha(file, client)
+        if dest.exists() and _sha256(dest) == expected:
+            return dest
+        with client.stream("GET", file.url) as resp:
+            resp.raise_for_status()
+            tmp = dest.with_suffix(".part")
+            with tmp.open("wb") as fh:
+                for chunk in resp.iter_bytes(1 << 20):
+                    fh.write(chunk)
+        if _sha256(tmp) != expected:
+            tmp.unlink()
+            raise ChecksumError(f"{file.filename}: SHA-256 mismatch vs {file.checksum_url}")
+        tmp.rename(dest)
+        return dest
+    finally:
+        if owns_client:
+            client.close()
