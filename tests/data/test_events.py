@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 import polars as pl
+import pytest
 
 from microstructure.data.events import to_aggressor_events
 
@@ -51,3 +52,33 @@ def test_input_not_mutated():
     before = df.clone()
     to_aggressor_events(df)
     assert df.equals(before)
+
+
+def test_zero_qty_group_raises():
+    """A group with total qty == 0 should raise ValueError."""
+    df = _df([[1, 100.0, 0.0, 1, 1, T0, False]])
+    with pytest.raises(ValueError):
+        to_aggressor_events(df)
+
+
+def test_same_ts_opposite_sides_deterministic_order():
+    """Same-ts opposite-side events must have deterministic order."""
+    # Build frame with buy-first order
+    df_buy_first = _df([
+        [1, 100.0, 1.0, 1, 1, T0, False],  # buy aggressor
+        [2, 100.0, 1.0, 2, 2, T0, True],   # sell aggressor
+    ])
+    # Build frame with sell-first order (inverted input row order)
+    df_sell_first = _df([
+        [2, 100.0, 1.0, 2, 2, T0, True],   # sell aggressor
+        [1, 100.0, 1.0, 1, 1, T0, False],  # buy aggressor
+    ])
+
+    ev_buy_first = to_aggressor_events(df_buy_first)
+    ev_sell_first = to_aggressor_events(df_sell_first)
+
+    # Both should produce the same output: sell (-1) before buy (+1)
+    assert ev_buy_first.equals(ev_sell_first)
+    # Verify sell row comes first (sign -1 < +1)
+    assert ev_buy_first.row(0, named=True)["sign"] == -1
+    assert ev_buy_first.row(1, named=True)["sign"] == 1
