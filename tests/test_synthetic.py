@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from microstructure.synthetic import fractional_signs, iid_signs, markov_signs
 
@@ -23,6 +24,18 @@ def test_markov_signs_match_theoretical_acf():
     s = markov_signs(400_000, p_repeat=p, seed=2)
     for k, expected in [(1, 0.5), (2, 0.25), (3, 0.125)]:
         assert abs(_acf(s, k) - expected) < 0.02
+
+
+@pytest.mark.parametrize("p_repeat", [0.0, 1.0, -0.1, 1.1])
+def test_markov_signs_rejects_p_repeat_outside_open_unit_interval(p_repeat):
+    with pytest.raises(ValueError):
+        markov_signs(10, p_repeat=p_repeat, seed=1)
+
+
+@pytest.mark.parametrize("d", [0.0, 0.5, -0.1, 0.6])
+def test_fractional_signs_rejects_d_outside_valid_range(d):
+    with pytest.raises(ValueError):
+        fractional_signs(10, d=d, seed=1)
 
 
 def test_fractional_signs_smoke_long_memory_slower_than_markov():

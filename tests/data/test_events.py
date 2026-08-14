@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import polars as pl
@@ -19,8 +19,8 @@ def _df(rows):
     )
 
 
-T0 = datetime(2023, 6, 22, 0, 0, 0, 123000, tzinfo=timezone.utc)
-T1 = datetime(2023, 6, 22, 0, 0, 0, 456000, tzinfo=timezone.utc)
+T0 = datetime(2023, 6, 22, 0, 0, 0, 123000, tzinfo=UTC)
+T1 = datetime(2023, 6, 22, 0, 0, 0, 456000, tzinfo=UTC)
 
 
 def test_same_ts_same_side_merged_into_one_event():

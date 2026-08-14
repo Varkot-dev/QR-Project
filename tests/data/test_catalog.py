@@ -1,13 +1,13 @@
 import hashlib
 import io
 import zipfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
 import httpx
-import pytest
 import polars as pl
+import pytest
 
 from microstructure.data.catalog import continuity_report, integrity_report, parquet_path, sync
 
@@ -23,8 +23,7 @@ _AGG_SCHEMA = {
 def _agg_trades_month(agg_trade_ids: list[int], year: int, month: int) -> pl.DataFrame:
     """Build a synthetic aggTrades month frame: one row per id, timestamps
     spaced evenly through the month, all within bounds."""
-    n = len(agg_trade_ids)
-    base = datetime(year, month, 2, tzinfo=timezone.utc)  # comfortably inside the month
+    base = datetime(year, month, 2, tzinfo=UTC)  # comfortably inside the month
     rows = [
         [tid, 100.0 + i, 1.0, tid, tid, base.replace(hour=i % 23), False]
         for i, tid in enumerate(agg_trade_ids)
@@ -87,7 +86,7 @@ def test_sync_rejects_corrupt_ingest_output(tmp_data_dir: Path):
 
     client = make_client()
     with patch("microstructure.data.catalog._INGESTERS", {"aggTrades": bad_ingester}):
-        with pytest.raises(Exception):  # Should raise on parquet validation failure
+        with pytest.raises(ValueError, match="Parquet verification failed"):
             sync(tmp_data_dir, "BTCUSDT", "aggTrades", "2023-06", "2023-06", client=client)
         # Verify canonical dest path does not exist
         dest = parquet_path(tmp_data_dir, "BTCUSDT", "aggTrades", "2023-06")

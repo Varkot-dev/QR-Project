@@ -66,7 +66,12 @@ def _sha256(path: Path) -> str:
 def _fetch_expected_sha(file: DumpFile, client: httpx.Client) -> str:
     resp = client.get(file.checksum_url)
     resp.raise_for_status()
-    return resp.text.split()[0].lower()
+    parts = resp.text.split()
+    if not parts:
+        raise ChecksumError(
+            f"{file.filename}: empty CHECKSUM body from {file.checksum_url}"
+        )
+    return parts[0].lower()
 
 
 def download(file: DumpFile, dest_dir: Path, client: httpx.Client | None = None) -> Path:

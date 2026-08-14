@@ -1,4 +1,9 @@
-from microstructure.data.binance import DumpFile, month_files
+from pathlib import Path
+
+import httpx
+import pytest
+
+from microstructure.data.binance import ChecksumError, DumpFile, download, month_files
 
 
 def test_dumpfile_url_monthly_aggtrades():
@@ -21,6 +26,20 @@ def test_month_files_inclusive_range():
 
 
 def test_month_files_rejects_bad_month():
-    import pytest
     with pytest.raises(ValueError):
         month_files("ETHUSDT", "aggTrades", "2023-13", "2024-02")
+
+
+def test_download_empty_checksum_body_raises_checksum_error(tmp_path: Path):
+    """An empty/whitespace CHECKSUM response body must raise ChecksumError
+    naming the file, not crash with an unrelated IndexError."""
+    f = DumpFile(symbol="BTCUSDT", data_type="aggTrades", period="2023-06")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith(".CHECKSUM"):
+            return httpx.Response(200, text="   \n")  # empty/whitespace-only body
+        return httpx.Response(200, content=b"irrelevant")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with pytest.raises(ChecksumError, match=f.filename):
+        download(f, tmp_path, client=client)

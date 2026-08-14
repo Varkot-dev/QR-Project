@@ -1,6 +1,7 @@
 """Local dataset registry: what's on disk, and one entry point to fill gaps."""
 from __future__ import annotations
 
+from itertools import pairwise
 from pathlib import Path
 
 import httpx
@@ -128,7 +129,7 @@ def continuity_report(root: Path, symbol: str, start: str, end: str) -> pl.DataF
         )
 
     joins_previous: list[bool | None] = [None]
-    for prev, cur in zip(summaries, summaries[1:]):
+    for prev, cur in pairwise(summaries):
         if prev["last_id"] is None or cur["first_id"] is None:
             joins_previous.append(None)
         else:
