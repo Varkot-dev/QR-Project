@@ -28,7 +28,7 @@ def test_real_daily_aggtrades_roundtrip(tmp_path: Path):
     zip_path = download(f, tmp_path)          # checksum-verified against Binance
     pq = ingest_agg_trades(zip_path, tmp_path)
     df = pl.read_parquet(pq)
-    assert df.height > 100_000                # a normal ETH day has ~1M+ prints
+    assert df.height > 100_000                # a normal ETH day has ~783k+ prints (observed)
     assert df["ts"].is_sorted()
     assert df["ts"][0].date().isoformat() == "2023-06-15"
     assert df["price"].min() > 100            # sanity: ETH was ~$1.6-1.9k mid-2023
