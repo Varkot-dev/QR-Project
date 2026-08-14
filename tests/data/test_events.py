@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from pathlib import Path
 
 import polars as pl
 import pytest
@@ -82,3 +83,20 @@ def test_same_ts_opposite_sides_deterministic_order():
     # Verify sell row comes first (sign -1 < +1)
     assert ev_buy_first.row(0, named=True)["sign"] == -1
     assert ev_buy_first.row(1, named=True)["sign"] == 1
+
+
+def test_lazyframe_input_matches_dataframe_input(tmp_path: Path):
+    """to_aggressor_events must accept pl.scan_parquet output (a LazyFrame)
+    and produce the same result as calling it on the equivalent DataFrame."""
+    df = _df([
+        [1, 100.0, 1.0, 1, 1, T0, False],
+        [2, 101.0, 3.0, 2, 2, T0, False],
+        [3, 100.5, 2.0, 3, 3, T1, True],
+    ])
+    parquet_path = tmp_path / "trades.parquet"
+    df.write_parquet(parquet_path)
+
+    ev_from_df = to_aggressor_events(df)
+    ev_from_lazy = to_aggressor_events(pl.scan_parquet(parquet_path))
+
+    assert ev_from_df.equals(ev_from_lazy)
