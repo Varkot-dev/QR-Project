@@ -54,3 +54,36 @@ def test_book_ticker_roundtrip(tmp_path: Path):
     df = pl.read_parquet(ingest_book_ticker(z, tmp_path))
     assert df.columns == ["update_id", "bid_price", "bid_qty", "ask_price", "ask_qty", "ts"]
     assert df["ask_price"][0] == 50000.1
+
+
+def test_agg_trades_header_only_file_yields_empty_frame_with_correct_schema(tmp_path: Path):
+    z = _zip_csv(tmp_path / "e", "e.csv", [AGG_HEADER])
+    df = pl.read_parquet(ingest_agg_trades(z, tmp_path))
+    assert df.height == 0
+    assert df.schema == {
+        "agg_trade_id": pl.Int64,
+        "price": pl.Float64,
+        "qty": pl.Float64,
+        "first_trade_id": pl.Int64,
+        "last_trade_id": pl.Int64,
+        "ts": pl.Datetime("ms", "UTC"),
+        "is_buyer_maker": pl.Boolean,
+    }
+
+
+def test_agg_trades_quoted_numeric_first_cell_not_treated_as_header(tmp_path: Path):
+    row_quoted = '"100","50000.5","0.010","200","201","1687392000123","true"'
+    z = _zip_csv(tmp_path / "f", "f.csv", [row_quoted])
+    df = pl.read_parquet(ingest_agg_trades(z, tmp_path))
+    assert df.height == 1
+    assert df["price"][0] == 50000.5
+
+
+def test_multi_member_zip_raises(tmp_path: Path):
+    import pytest
+    z = tmp_path / "multi.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr("a.csv", "data1\n")
+        zf.writestr("b.csv", "data2\n")
+    with pytest.raises(ValueError):
+        ingest_agg_trades(z, tmp_path)
