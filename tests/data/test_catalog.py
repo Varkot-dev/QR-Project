@@ -1,6 +1,7 @@
 import hashlib
 import io
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -8,9 +9,27 @@ import httpx
 import pytest
 import polars as pl
 
-from microstructure.data.catalog import integrity_report, parquet_path, sync
+from microstructure.data.catalog import continuity_report, integrity_report, parquet_path, sync
 
 AGG_ROW = "100,50000.5,0.010,200,201,1687392000123,true"
+
+_AGG_SCHEMA = {
+    "agg_trade_id": pl.Int64, "price": pl.Float64, "qty": pl.Float64,
+    "first_trade_id": pl.Int64, "last_trade_id": pl.Int64,
+    "ts": pl.Datetime("ms", "UTC"), "is_buyer_maker": pl.Boolean,
+}
+
+
+def _agg_trades_month(agg_trade_ids: list[int], year: int, month: int) -> pl.DataFrame:
+    """Build a synthetic aggTrades month frame: one row per id, timestamps
+    spaced evenly through the month, all within bounds."""
+    n = len(agg_trade_ids)
+    base = datetime(year, month, 2, tzinfo=timezone.utc)  # comfortably inside the month
+    rows = [
+        [tid, 100.0 + i, 1.0, tid, tid, base.replace(hour=i % 23), False]
+        for i, tid in enumerate(agg_trade_ids)
+    ]
+    return pl.DataFrame(rows, schema=_AGG_SCHEMA, orient="row")
 
 
 def _zip_bytes() -> bytes:
@@ -79,3 +98,45 @@ def test_sync_unknown_data_type_raises_value_error(tmp_data_dir: Path):
     """Verify that sync raises ValueError for unknown data_type."""
     with pytest.raises(ValueError, match="unknown data_type"):
         sync(tmp_data_dir, "BTCUSDT", "nope", "2023-06", "2023-06")
+
+
+def test_continuity_report_clean_pair_all_checks_pass(tmp_data_dir: Path):
+    """Two consecutive months with fully sequential agg_trade_ids and
+    in-bounds timestamps: id_gaps==0, ts_in_bounds True, joins_previous True."""
+    june = _agg_trades_month(list(range(1, 11)), 2023, 6)  # ids 1..10
+    july = _agg_trades_month(list(range(11, 21)), 2023, 7)  # ids 11..20, joins june
+
+    june_path = parquet_path(tmp_data_dir, "BTCUSDT", "aggTrades", "2023-06")
+    july_path = parquet_path(tmp_data_dir, "BTCUSDT", "aggTrades", "2023-07")
+    june_path.parent.mkdir(parents=True, exist_ok=True)
+    july_path.parent.mkdir(parents=True, exist_ok=True)
+    june.write_parquet(june_path)
+    july.write_parquet(july_path)
+
+    rep = continuity_report(tmp_data_dir, "BTCUSDT", "2023-06", "2023-07")
+    assert rep["period"].to_list() == ["2023-06", "2023-07"]
+    assert rep["rows"].to_list() == [10, 10]
+    assert rep["id_gaps"].to_list() == [0, 0]
+    assert rep["ts_in_bounds"].to_list() == [True, True]
+    assert rep["joins_previous"].to_list() == [None, True]
+
+
+def test_continuity_report_deleted_row_and_broken_join_detected(tmp_data_dir: Path):
+    """June is missing id 5 (a deleted middle row) -> id_gaps==1 for June.
+    July does not start right after June's last id -> joins_previous False."""
+    june_ids = [i for i in range(1, 11) if i != 5]  # ids 1..10 minus 5 -> gap of 1
+    june = _agg_trades_month(june_ids, 2023, 6)
+    july = _agg_trades_month(list(range(50, 60)), 2023, 7)  # does not join june
+
+    june_path = parquet_path(tmp_data_dir, "BTCUSDT", "aggTrades", "2023-06")
+    july_path = parquet_path(tmp_data_dir, "BTCUSDT", "aggTrades", "2023-07")
+    june_path.parent.mkdir(parents=True, exist_ok=True)
+    july_path.parent.mkdir(parents=True, exist_ok=True)
+    june.write_parquet(june_path)
+    july.write_parquet(july_path)
+
+    rep = continuity_report(tmp_data_dir, "BTCUSDT", "2023-06", "2023-07")
+    assert rep["rows"].to_list() == [9, 10]
+    assert rep["id_gaps"].to_list() == [1, 0]
+    assert rep["ts_in_bounds"].to_list() == [True, True]
+    assert rep["joins_previous"].to_list() == [None, False]
