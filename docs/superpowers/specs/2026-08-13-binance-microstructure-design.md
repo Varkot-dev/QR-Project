@@ -35,7 +35,11 @@ Fit Hawkes to the same tape (branching ratio with kernel-sensitivity analysis pe
 ## 3. Data
 
 - **Source:** data.binance.vision public dumps (free, no account). Primary: **USDT-M futures** `aggTrades` (taker-side pre-signed — no trade-sign classification needed) + `bookTicker` (best bid/ask price & size tape → mid-prices and L1 depth for Q2/Q3). Spot `aggTrades` as robustness check for Q1.
-- **Phase 1 scope:** BTCUSDT + ETHUSDT perps, 6 recent months. Estimated tens of GB raw; stored as monthly Parquet after ingestion.
+- **VERIFIED 2026-08-13 against the S3 bucket directly** (not from secondary sources):
+  - `aggTrades` monthly: available through 2026-07 (current).
+  - `bookTicker`: **only exists 2023-05 → 2024-04** (dumps discontinued after that). This bounds where clean mid-price/L1 analysis is possible.
+  - `bookDepth` (daily, sampled depth snapshots) and `metrics`: available through present.
+- **Phase 1 sample period (consequence of the above):** **2023-06 → 2024-03** (10 months) for BTCUSDT + ETHUSDT perps — the window where aggTrades and bookTicker overlap. Q1 (trades-only) additionally run on recent 2026 data as a regime robustness check. Estimated tens of GB raw; stored as monthly Parquet after ingestion.
 - **Known data quirks to handle (from the literature review):** millisecond timestamp resolution (no kernel/ACF claims below ~10ms lags); one matching-engine event prints multiple times — **aggregate fills sharing (timestamp, side) into single aggressor events** before any analysis; 8h funding-clock seasonality on perps; deseasonalize or use event-time where appropriate.
 
 ## 4. Architecture
@@ -76,7 +80,7 @@ LEARNING.md        # every concept explained as we hit it; interview-prep artifa
 | Risk | Mitigation |
 |---|---|
 | Tick data volume overwhelms laptop | Start 2 symbols × 6 months; Parquet + polars lazy scans; downsample only with explicit justification |
-| bookTicker files too large/absent for some months | Fall back to trade-price response function (documented caveat); verify availability in week 1 |
+| bookTicker discontinued after 2024-04 (VERIFIED) | Resolved by design: Phase-1 window fixed to 2023-06→2024-03; recent-data analyses use trade prices + sampled bookDepth with documented caveats |
 | Estimator subtleties (log-log fitting traps) | Synthetic-data validation first, always; consult the pitfalls sections in research/02 |
 | Scope creep into Phase 2/3 early | Phase gates: Phase 1 write-up complete before any Phase 2 code |
 | User time (recruiting season) | Each research question is independently completable; stopping after Q2 still yields a coherent repo |
