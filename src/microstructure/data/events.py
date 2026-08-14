@@ -13,7 +13,11 @@ import polars as pl
 
 
 def to_aggressor_events(df: pl.DataFrame | pl.LazyFrame) -> pl.DataFrame:
-    """Merge consecutive same-(ts, side) prints; returns a new frame.
+    """Merge ALL same-(ts, side) prints in the frame; returns a new frame.
+
+    The group_by merges every row sharing the same (ts, is_buyer_maker) pair
+    anywhere in the input, not just adjacent/consecutive rows — input row
+    order does not affect which rows get merged or the resulting output.
 
     Raises ValueError if any aggregated group has qty <= 0 (prevents NaN prices).
     Tie-break for same-ts opposite-side events: sort by (ts, sign) so sells (-1)
