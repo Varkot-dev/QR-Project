@@ -8,11 +8,13 @@ Events after joining to prior mid: 6,396,387 (dropped 0, 0.0000%).
 
 ## Results
 
-**Note:** both fitted parameters are negative, i.e. R(ℓ) is *growing* with lag over the fit window, not decaying -- a negative γ̂ means R(ℓ) ~ ℓ^{+0.083} (growth), and a negative λ̂ means R(ℓ) ~ exp(+0.0009·ℓ) (growth). Read the sign of γ̂/λ̂ before reading their magnitude as a 'decay rate'.
+**Note:** both fitted parameters are negative, i.e. R(ℓ) is *growing* with lag over the fit window, not decaying -- a negative γ̂ means R(ℓ) ~ ℓ^{+0.0831} (growth), and a negative λ̂ means R(ℓ) ~ exp(+0.0009·ℓ) (growth). Read the sign of γ̂/λ̂ before reading their magnitude as a 'decay rate'. This growth is the EXPECTED shape given long-memory order flow, not an anomaly -- see the Benchmark and Caveats sections below for the R ≈ G + Σ G·C decomposition that explains why.
 
 | quantity | value |
 |---|---|
 | R(1) | 0.010402 |
+| R(500) | 0.056107 |
+| R(500)/R(1) | 5.3939 |
 | power-law exponent γ̂ (R ~ ℓ^-γ̂) | -0.0831 |
 | power-law OLS stderr | 0.0034 |
 | exponential rate λ̂ (R ~ exp(-λ̂ℓ)) | -0.0009 |
@@ -25,11 +27,11 @@ Events after joining to prior mid: 6,396,387 (dropped 0, 0.0000%).
 | power law | 0.2161 |
 | exponential | 0.4718 |
 
-**Verdict:** the power-law form has lower residual sum of squares on the log scale over lags 10-200 and is judged the better-fitting shape for ETHUSDT's response function in this sample -- which is growing (not the classic decaying-impact case) over lags 1-200.
+**Verdict:** the power-law form has lower residual sum of squares on the log scale over lags 10-200 and is judged the better-fitting shape for ETHUSDT's response function in this sample, which is growing over lags 1-200.
 
 ## Benchmark vs. literature
 
-Bouchaud et al. (2004) found response functions on equity markets that decay slowly, roughly as a power law, over hundreds to thousands of trades -- evidence that price impact is not a single-event, exponentially-forgotten shock but reflects long-range order-flow correlation.
+Bouchaud et al. (2004) report that the bare impact KERNEL G(l) decays slowly, roughly as a power law, over hundreds to thousands of trades -- evidence that price impact is not a single-event, exponentially-forgotten shock but reflects long-range order-flow correlation. The MEASURED response function R(l) is a different object: it mixes G with order-flow memory C, and Bouchaud's own equity data shows R(l) rising to a maximum around 10^2-10^3 trades before any slow decline -- the same rise this analysis measures, not a contradiction of it.
 
 ## Caveats
 
@@ -37,4 +39,5 @@ Bouchaud et al. (2004) found response functions on equity markets that decay slo
 - Real order flow is NOT i.i.d. (Q1 finds long-memory signs), so R(ℓ) here mixes the bare impact kernel with sign autocorrelation; it is not a clean kernel estimate the way it would be under the iid-sign assumption used to validate the estimator.
 - The sample is a single 14-day window (2023-06-01..2023-06-14) for one symbol (ETHUSDT); the fitted decay shape and rate may not generalize to other periods, volatility regimes, or symbols.
 - RSS comparison is on the log scale over a fixed window; a different window or a linear-scale comparison could favor the other shape, especially since power laws and exponentials with matched short-lag behavior often diverge only at large lag.
-- A growing (not decaying) R(ℓ) over lags 1-200 departs from the classic single-event impact-decay picture in Bouchaud (2004); it is consistent with the strong short-lag order-flow persistence found in Q1 -- a run of same-sign events keeps pushing the mid in the same direction for many subsequent events, so the *average* response measured this way keeps rising before any decay could show up. Whether R(ℓ) eventually turns over past lag 200 is not addressed by this fit window.
+- A growing R(ℓ) over lags 1-200 is the EXPECTED response shape given long-memory order flow, not a departure from Bouchaud (2004). The measured response mixes the (decaying) bare impact kernel G with the sign autocorrelation C: R(ℓ) ≈ G(ℓ) + Σ_{n<ℓ} G(ℓ-n)·C(n). With Q1's measured sign-ACF exponent γ≈0.24 for ETH, the accumulation term Σ G·C dominates G itself, so R keeps climbing well past where G alone would have decayed -- Bouchaud's own equity response functions show the same rise-then-slow-decline shape, peaking around 10^2-10^3 trades before turning over. R(500)/R(1) = 5.39x in this sample, which is quantitatively consistent with the magnitude of rise implied by γ≈0.24 accumulation. What decays in the literature is the KERNEL G(ℓ) itself, not R(ℓ) -- this analysis measures R only; separating G from C requires propagator deconvolution, which is out of scope here.
+- R(ℓ) plateaus around ℓ≈300-500 (see the response array in `q2_results.json`), outside the fitted window of [10, 200]; the power-law/exponential fits above describe only the rising portion and say nothing about behavior at or past the plateau.

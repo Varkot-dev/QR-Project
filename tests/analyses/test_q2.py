@@ -93,9 +93,10 @@ def test_run_q2_recovers_known_exponential_kernel(tmp_path: Path):
         expected = g0 * phi ** (lag - 1)
         assert abs(response[lag] - expected) < 0.03
 
-    # exponential decay -> exponent should be recovered close to -log(phi) per step
-    assert res["decay_exponent"] > 0  # power-law gamma or exp rate, either way: decaying
-    assert res["decay_stderr"] >= 0
+    # synthetic kernel is a decaying exponential (iid signs -> R(l) = g(l), no
+    # accumulation term), so the fitted response exponent should come out positive here.
+    assert res["response_exponent"] > 0
+    assert res["response_stderr"] >= 0
 
 
 def test_run_q2_raises_on_excessive_drop_rate(tmp_path: Path):
