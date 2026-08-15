@@ -99,8 +99,8 @@ as suggestive of the right direction rather than a measurement that rejects the 
 ### 1. Environment
 
 ```bash
-git clone <repo-url>
-cd "QR project"
+git clone git@github.com:Varkot-dev/QR-Project.git
+cd QR-Project
 uv sync
 ```
 
@@ -126,7 +126,7 @@ published SHA-256 and nothing reaches its canonical path unverified; both comman
 so re-running skips what is already present.
 
 ```bash
-# Monthly aggTrades: BTC + ETH, 2023-06 through 2023-07  (~90 GB unpacked, ~1.3 GB as Parquet)
+# Monthly aggTrades: BTC + ETH, 2023-06 through 2023-07  (~0.9 GB as Parquet)
 uv run python -c "
 from pathlib import Path
 from microstructure.data.catalog import sync

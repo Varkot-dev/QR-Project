@@ -406,6 +406,14 @@ on two months of *trades* predicts a ratio measured in Q2 from 14 days of *quote
 different datasets, two different estimators, one consistent theory. That is much stronger
 evidence that both analyses are correct than either result is on its own.
 
+One important limit on what that agreement proves: the toy band predicts the **magnitude** of
+the rise, not its **shape**. The calculation assumes `R(ℓ) ~ ℓ^γ` all the way out to ℓ = 500, but
+this document already notes that R plateaus — measured R(500)/R(100) = 1.056×, whereas a pure
+power law with γ ≈ 0.24 would give `5^0.24 ≈ 1.47×` over that same stretch. So the pure
+power-law form overstates late-lag growth, and the plateau means the accumulation term has
+largely saturated by ℓ ≈ 100. The 5.39× landing in-band is consistent with the mechanism, but it
+is not evidence for the functional form.
+
 **What we still cannot claim.** We measured `R`, not `G`. Separating the kernel from the flow
 memory requires propagator deconvolution, which is out of scope here. So the honest verdict is:
 *the response function's rising portion is better described by a power law than an exponential
