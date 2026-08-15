@@ -2,6 +2,7 @@
 
 Base layout (verified 2026-08-13 against the S3 bucket):
 https://data.binance.vision/data/futures/um/monthly/{dataType}/{SYMBOL}/{SYMBOL}-{dataType}-{YYYY-MM}.zip
+https://data.binance.vision/data/futures/um/daily/{dataType}/{SYMBOL}/{SYMBOL}-{dataType}-{YYYY-MM-DD}.zip
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ from pathlib import Path
 import httpx
 
 BASE = "https://data.binance.vision/data/futures/um/monthly"
+DAILY_BASE = "https://data.binance.vision/data/futures/um/daily"
 _MONTH_RE = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
 
 
@@ -20,7 +22,8 @@ _MONTH_RE = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
 class DumpFile:
     symbol: str
     data_type: str
-    period: str  # "YYYY-MM"
+    period: str  # "YYYY-MM" or "YYYY-MM-DD"
+    base: str = BASE
 
     @property
     def filename(self) -> str:
@@ -28,7 +31,7 @@ class DumpFile:
 
     @property
     def url(self) -> str:
-        return f"{BASE}/{self.data_type}/{self.symbol}/{self.filename}"
+        return f"{self.base}/{self.data_type}/{self.symbol}/{self.filename}"
 
     @property
     def checksum_url(self) -> str:
@@ -48,6 +51,18 @@ def month_files(symbol: str, data_type: str, start: str, end: str) -> list[DumpF
         mo += 1
         if mo == 13:
             y, mo = y + 1, 1
+    return out
+
+
+def day_files(symbol: str, data_type: str, start: str, end: str) -> list[DumpFile]:
+    """All daily DumpFiles from start to end inclusive ("YYYY-MM-DD")."""
+    import datetime as _dt
+
+    d0, d1 = _dt.date.fromisoformat(start), _dt.date.fromisoformat(end)
+    out: list[DumpFile] = []
+    while d0 <= d1:
+        out.append(DumpFile(symbol, data_type, d0.isoformat(), base=DAILY_BASE))
+        d0 += _dt.timedelta(days=1)
     return out
 
 
