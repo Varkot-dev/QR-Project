@@ -71,3 +71,19 @@ def test_events_with_prior_mid_drops_events_before_first_quote(tmp_path: Path):
     out, n_dropped = events_with_prior_mid(events, bt)
     assert out.height == 0
     assert n_dropped == 1
+
+
+def test_events_with_prior_mid_rejects_non_ms_timestamps():
+    events = pl.DataFrame(
+        {"ts": [_ts(5)], "sign": [1], "qty": [1.0],
+         "price": [100.0], "n_prints": [1]},
+        schema_overrides={"ts": pl.Datetime("us", "UTC"), "sign": pl.Int8, "n_prints": pl.UInt32},
+    )
+    bt = pl.DataFrame(
+        {"update_id": [1], "bid_price": [99.0], "bid_qty": [1.0],
+         "ask_price": [101.0], "ask_qty": [1.0], "ts": [_ts(3)]},
+        schema_overrides={"ts": pl.Datetime("ms", "UTC")},
+    ).with_columns(((pl.col("bid_price") + pl.col("ask_price")) / 2).alias("mid"))
+    with pytest.raises(ValueError) as ei:
+        events_with_prior_mid(events, bt)
+    assert "events ts must be Datetime('ms', 'UTC')" in str(ei.value)
