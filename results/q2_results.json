@@ -1,0 +1,12 @@
+{
+  "decay_exponent": -0.08311092118919164,
+  "decay_stderr": 0.0034113866877482136,
+  "n_events": 6396387,
+  "n_dropped": 0,
+  "drop_fraction": 0.0,
+  "power_law_rss": 0.21607898036080478,
+  "exponential_rate": -0.0008534307355539008,
+  "exponential_stderr": 6.556558539664659e-05,
+  "exponential_rss": 0.4717594856597064,
+  "better_fit": "power_law"
+}
