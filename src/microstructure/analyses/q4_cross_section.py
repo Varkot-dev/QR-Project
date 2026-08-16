@@ -428,8 +428,10 @@ def _write_results_md(out_dir: Path, result: dict) -> None:
             f"log-activity (slope {flip_reg['slope']:.4f}, R² {flip_reg['r2']:.4f}); since "
             "p_flip = 0.5 corresponds to no persistence, this indicates that persistence "
             f"{'strengthens' if flip_reg['slope'] < 0 else 'weakens' if flip_reg['slope'] > 0 else 'is unrelated to activity level'} "
-            "as activity increases (a slope below zero means p_flip falls toward more "
-            "persistent behavior at higher activity)."
+            "as activity increases "
+            f"(a slope {'below' if flip_reg['slope'] < 0 else 'above' if flip_reg['slope'] > 0 else 'equal to'} zero means "
+            f"p_flip {'falls toward more persistent' if flip_reg['slope'] < 0 else 'rises toward more anti-persistent' if flip_reg['slope'] > 0 else 'does not change'} "
+            "behavior at higher activity)."
         )
     else:
         lines.append(

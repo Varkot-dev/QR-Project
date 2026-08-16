@@ -61,7 +61,7 @@ Requested: 207. Successful: 121. Skipped (below min_events): 86. Failed: 0.
 
 The fitted order-flow memory exponent γ̂ **decreases** with log-activity across the 121-symbol successful set (slope -0.0112, R² 0.0003), i.e. more actively traded symbols in this sample tend to show weaker long-memory decay than less actively traded ones.
 
-The sign-flip probability p_flip **increases** with log-activity (slope 0.1114, R² 0.2632); since p_flip = 0.5 corresponds to no persistence, this indicates that persistence weakens as activity increases (a slope below zero means p_flip falls toward more persistent behavior at higher activity).
+The sign-flip probability p_flip **increases** with log-activity (slope 0.1114, R² 0.2632); since p_flip = 0.5 corresponds to no persistence, this indicates that persistence weakens as activity increases (a slope above zero means p_flip rises toward more anti-persistent behavior at higher activity).
 
 ## Skipped (below min_events)
 
