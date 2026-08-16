@@ -59,6 +59,12 @@ def intraday_rate_profile(ts: np.ndarray, n_bins: int = 48) -> np.ndarray:
     sampling noise (short/data-starved windows), not a truly dead trading
     period, and callers estimating a profile from very short or highly
     intermittent samples should be aware the floor can distort empty hours.
+    The floor is applied BEFORE the mean-1 normalization (floor, then
+    renormalize by dividing by the floored array's own mean), so the
+    returned profile's mean is always exactly 1 — including when bins were
+    floored — which in turn keeps `rescale_to_business_time`'s "one full day
+    integrates to exactly 86400 seconds" property exact rather than
+    approximate.
 
     Raises ValueError if `ts` is empty or `n_bins` is not a positive
     integer.
@@ -77,6 +83,7 @@ def intraday_rate_profile(ts: np.ndarray, n_bins: int = 48) -> np.ndarray:
     mean_count = ts.size / n_bins
     profile = counts / mean_count
     profile = np.maximum(profile, _EMPTY_BIN_FLOOR)
+    profile = profile / profile.mean()
     return profile
 
 
@@ -106,8 +113,13 @@ def rescale_to_business_time(ts: np.ndarray, profile: np.ndarray) -> np.ndarray:
 
     Raises ValueError if `ts` is empty, if `ts` has fewer than 2 events (a
     single event has no informative inter-event structure so rescaling is
-    meaningless for downstream Hawkes fitting), or if `profile` has an
-    invalid shape (empty, non-1-D, or containing non-positive values).
+    meaningless for downstream Hawkes fitting), if `ts` is not sorted in
+    non-decreasing order (the day/bin decomposition and the `tau - tau[0]`
+    anchor both assume `ts[0]` is the earliest event; an unsorted input
+    would silently produce a nonsensical or negative business-time axis
+    rather than erroring), or if `profile` has an invalid shape (empty,
+    non-1-D, containing non-finite values, or containing non-positive
+    values).
     """
     ts = np.asarray(ts, dtype=np.int64)
     profile = np.asarray(profile, dtype=np.float64)
@@ -116,10 +128,12 @@ def rescale_to_business_time(ts: np.ndarray, profile: np.ndarray) -> np.ndarray:
         raise ValueError("ts must not be empty")
     if ts.size < 2:
         raise ValueError("need at least 2 events to rescale to business time")
+    if np.any(np.diff(ts) < 0):
+        raise ValueError("ts must be sorted in non-decreasing order")
     if profile.ndim != 1 or profile.size == 0:
         raise ValueError("profile must be a non-empty 1-D array")
-    if np.any(profile <= 0.0):
-        raise ValueError("profile must be strictly positive everywhere")
+    if not np.all(np.isfinite(profile)) or np.any(profile <= 0.0):
+        raise ValueError("profile must be finite and strictly positive everywhere")
 
     n_bins = profile.size
     bin_width_ms = MS_PER_DAY / n_bins

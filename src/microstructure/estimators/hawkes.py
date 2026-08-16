@@ -115,6 +115,112 @@ def simulate_hawkes_exp(mu: float, alpha: float, beta: float, t_end: float, seed
     return np.asarray(events, dtype=np.float64)
 
 
+def simulate_seasonal_hawkes_exp(
+    mu_bar: float, alpha: float, beta: float, t_end: float, shape: np.ndarray, seed: int
+) -> np.ndarray:
+    """Simulate a Hawkes process with a periodic (24h), piecewise-constant baseline.
+
+    λ(t) = mu_bar*shape(tod(t)) + Σ_{t_i < t} alpha*beta*exp(-beta*(t - t_i))
+
+    where `shape` is an `n_bins`-length array (mean 1 by construction, as
+    returned by `microstructure.signals.eventtime.intraday_rate_profile`)
+    giving the baseline-rate multiplier for each equal-width time-of-day bin
+    over a 24h period (period = 86400 SECONDS here, since this module works
+    in float seconds, not the eventtime module's epoch-ms; the caller is
+    responsible for keeping units consistent, e.g. by choosing `shape` to
+    represent one bin per 86400/n_bins seconds and treating `t=0` as the
+    start of a day). `tod(t)` is `t mod 86400`.
+
+    This is the honest generative model this module was missing: unlike
+    thinning an already-simulated homogeneous-mu Hawkes process by a
+    time-of-day mask (an approximation used in
+    tests/signals/test_eventtime.py's `_thin_by_daily_profile` secondary
+    control test — see that test's docstring), this simulator makes the
+    baseline rate itself seasonal from the start, so it does not also
+    discard already-realized self-excited "child" events the way
+    post-hoc thinning does. It is the correct tool for testing that
+    business-time rescaling recovers the true branching ratio from a
+    seasonality-confounded Hawkes fit.
+
+    Algorithm: same Ogata (1978) thinning / exponential-kernel excitation
+    tracking as `simulate_hawkes_exp`, except the constant `mu` is replaced
+    by `mu_bar*shape[bin_idx(t)]` and the thinning upper bound
+    `lambda_bar = mu_bar*max(shape) + excitation + alpha*beta` uses the
+    seasonal peak (`max(shape)`) instead of a constant baseline, since the
+    baseline term is no longer constant between accepted events (only the
+    excitation term's monotonic decay is exploited for the bound, same as
+    the unseasonal simulator; the baseline swap point (bin boundary) is a
+    negligible/zero-measure event under continuous-time thinning so no
+    special-casing across bin boundaries is required for correctness).
+
+    Sanity property: with `shape` identically 1 everywhere, this reduces
+    statistically to `simulate_hawkes_exp(mu_bar, alpha, beta, t_end, seed)`
+    (same distribution, not necessarily the same realized event times,
+    since the acceptance draws differ once `lambda_bar` differs — verified
+    in tests/estimators/test_hawkes.py via matched event-count and fitted-
+    parameter statistics, not exact event-time equality).
+    """
+    if beta <= 0.0:
+        raise ValueError("beta must be positive")
+    if mu_bar <= 0.0:
+        raise ValueError("mu_bar must be positive")
+    if alpha < 0.0 or alpha >= 1.0:
+        raise ValueError(
+            f"alpha must be in [0, 1); got {alpha}. alpha >= 1 is explosive/"
+            "non-stationary (branching ratio >= 1, expected event count "
+            "diverges) and thinning would never terminate."
+        )
+    if t_end <= 0.0:
+        raise ValueError("t_end must be positive")
+
+    shape = np.asarray(shape, dtype=np.float64)
+    if shape.ndim != 1 or shape.size == 0:
+        raise ValueError("shape must be a non-empty 1-D array")
+    if not np.all(np.isfinite(shape)) or np.any(shape <= 0.0):
+        raise ValueError("shape must be finite and strictly positive everywhere")
+
+    day_s = 86_400.0
+    n_bins = shape.size
+    bin_width_s = day_s / n_bins
+    shape_max = float(shape.max())
+
+    rng = np.random.default_rng(seed)
+    events: list[float] = []
+
+    t = 0.0
+    excitation = 0.0  # E(t) just after the most recent processed point
+    # Upper bound on the baseline is mu_bar*shape_max (seasonal peak); the
+    # excitation term contributes its own post-event peak as in the
+    # unseasonal simulator.
+    lambda_bar = mu_bar * shape_max + excitation + alpha * beta
+
+    while t < t_end:
+        t += rng.exponential(1.0 / lambda_bar)
+        if t >= t_end:
+            break
+
+        if events:
+            dt_last = t - events[-1]
+            excitation_at_t = excitation * np.exp(-beta * dt_last)
+        else:
+            excitation_at_t = 0.0
+
+        bin_idx = min(int((t % day_s) / bin_width_s), n_bins - 1)
+        baseline_at_t = mu_bar * shape[bin_idx]
+        lam_t = baseline_at_t + excitation_at_t
+
+        u = rng.random()
+        if u <= lam_t / lambda_bar:
+            events.append(t)
+            excitation = excitation_at_t + alpha * beta
+            lambda_bar = mu_bar * shape_max + excitation + alpha * beta
+        # else rejected: lambda_bar remains a valid upper bound (baseline is
+        # capped at mu_bar*shape_max, excitation only decays between
+        # accepted events), continue thinning from t.
+
+    return np.asarray(events, dtype=np.float64)
+
+
 # ---------------------------------------------------------------------------
 # MLE: O(N) recursion + hand-rolled multi-start Nelder-Mead.
 # ---------------------------------------------------------------------------

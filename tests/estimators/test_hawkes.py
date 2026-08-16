@@ -18,6 +18,7 @@ from microstructure.estimators.hawkes import (
     fit_hawkes_exp,
     hawkes_loglik,
     simulate_hawkes_exp,
+    simulate_seasonal_hawkes_exp,
 )
 
 # ---------------------------------------------------------------------------
@@ -313,3 +314,78 @@ def test_regime_switching_poisson_produces_spurious_endogeneity_trap():
         f"expected the regime-switching trap to also fool the MLE with "
         f"fitted alpha > 0.5, got {fit.alpha}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Group 5: simulate_seasonal_hawkes_exp (Phase-3 Task 2 rebuild) — a Hawkes
+# process with a genuinely time-varying (periodic, piecewise-constant)
+# baseline rate, for testing business-time rescaling against a real
+# generative model rather than a post-hoc-thinned approximation.
+# ---------------------------------------------------------------------------
+
+
+def test_simulate_seasonal_rejects_invalid_parameters():
+    flat_shape = np.ones(48)
+    with pytest.raises(ValueError):
+        simulate_seasonal_hawkes_exp(0.0, 0.4, 2.0, 1000.0, flat_shape, seed=1)
+    with pytest.raises(ValueError):
+        simulate_seasonal_hawkes_exp(-0.1, 0.4, 2.0, 1000.0, flat_shape, seed=1)
+    with pytest.raises(ValueError):
+        simulate_seasonal_hawkes_exp(0.5, -0.1, 2.0, 1000.0, flat_shape, seed=1)
+    with pytest.raises(ValueError):
+        simulate_seasonal_hawkes_exp(0.5, 1.0, 2.0, 1000.0, flat_shape, seed=1)
+    with pytest.raises(ValueError):
+        simulate_seasonal_hawkes_exp(0.5, 0.4, 0.0, 1000.0, flat_shape, seed=1)
+    with pytest.raises(ValueError):
+        simulate_seasonal_hawkes_exp(0.5, 0.4, 2.0, 0.0, flat_shape, seed=1)
+    with pytest.raises(ValueError):
+        simulate_seasonal_hawkes_exp(0.5, 0.4, 2.0, 1000.0, np.array([]), seed=1)
+    with pytest.raises(ValueError):
+        # non-positive entry in shape
+        bad_shape = np.ones(48)
+        bad_shape[3] = 0.0
+        simulate_seasonal_hawkes_exp(0.5, 0.4, 2.0, 1000.0, bad_shape, seed=1)
+    with pytest.raises(ValueError):
+        # non-finite entry in shape
+        bad_shape = np.ones(48)
+        bad_shape[3] = np.nan
+        simulate_seasonal_hawkes_exp(0.5, 0.4, 2.0, 1000.0, bad_shape, seed=1)
+
+
+def test_simulate_seasonal_stationary_shape_recovers_known_parameters():
+    """Sanity: a flat (mean-1) shape gives no seasonal confound, so a fit on
+    the seasonal simulator's output should recover parameters just as well
+    as the unseasonal simulator does (Group 1's tolerances)."""
+    flat_shape = np.ones(48)
+    times = simulate_seasonal_hawkes_exp(TRUE_MU, TRUE_ALPHA, TRUE_BETA, T_END, flat_shape, seed=7)
+    fit_times = times[times <= FIT_SUBSAMPLE_T]
+    fit = fit_hawkes_exp(fit_times, FIT_SUBSAMPLE_T)
+    assert fit.converged
+    assert abs(fit.alpha - TRUE_ALPHA) < 0.05, f"alpha={fit.alpha}"
+    assert abs(fit.mu - TRUE_MU) < 0.08, f"mu={fit.mu}"
+
+
+def test_simulate_seasonal_reduces_to_unseasonal_statistically():
+    """With shape≡1, the seasonal simulator's output should be statistically
+    indistinguishable (matched event count and fitted-parameter ballpark)
+    from `simulate_hawkes_exp` on the same parameters -- not the same exact
+    event times (the acceptance draws differ once lambda_bar's composition
+    differs), but the same underlying distribution."""
+    flat_shape = np.ones(48)
+    seasonal_times = simulate_seasonal_hawkes_exp(
+        TRUE_MU, TRUE_ALPHA, TRUE_BETA, T_END, flat_shape, seed=7
+    )
+    unseasonal_times = simulate_hawkes_exp(TRUE_MU, TRUE_ALPHA, TRUE_BETA, T_END, seed=7)
+
+    # Event counts should be close (same Poisson-driven rate structure);
+    # allow a generous relative tolerance since seeds drive different
+    # candidate-acceptance sequences.
+    rel_diff = abs(seasonal_times.size - unseasonal_times.size) / unseasonal_times.size
+    assert rel_diff < 0.05, (
+        f"seasonal n={seasonal_times.size} vs unseasonal n={unseasonal_times.size}, "
+        f"rel_diff={rel_diff}"
+    )
+
+    fit_times = seasonal_times[seasonal_times <= FIT_SUBSAMPLE_T]
+    fit = fit_hawkes_exp(fit_times, FIT_SUBSAMPLE_T)
+    assert abs(fit.alpha - TRUE_ALPHA) < 0.05, f"alpha={fit.alpha}"
