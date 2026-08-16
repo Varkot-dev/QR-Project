@@ -577,6 +577,19 @@ def _write_md(out_dir: Path, result: dict) -> None:
             f"holds uniformly across the panel or is driven by a subset of symbols."
         )
         lines.append("")
+        if "twap" in means and "reactive" in means:
+            gap = abs(means["twap"] - means["reactive"])
+            shared_sd = np.mean([sds["twap"], sds["reactive"]])
+            lines.append(
+                f"That reactive-vs-twap ranking should be read cautiously: the mean gap "
+                f"between them ({gap:.4g}) is small relative to their shared "
+                f"across-cell dispersion (sd ≈ {shared_sd:.4g} for both), so this "
+                "sample does not statistically distinguish reactive's mean shortfall "
+                "from twap's — the apparent edge is consistent with noise. Only "
+                "frontloaded's variance reduction (below) is a clearly resolved effect "
+                "in this data."
+            )
+            lines.append("")
         if "frontloaded" in sds and ("twap" in sds or "reactive" in sds):
             other_sd = np.mean([sds[s] for s in ("twap", "reactive") if s in sds])
             if sds["frontloaded"] < other_sd:

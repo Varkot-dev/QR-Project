@@ -44,6 +44,8 @@ The flow-reactive schedule's (lookback, pause_threshold) are chosen by grid sear
 
 Over the evaluation window, **reactive** has the lowest mean shortfall per unit (-0.0111392) and **frontloaded** the highest (0.130551) among the three schedules under this cost model, pooled across symbols, sides, and parent sizes. See the per-symbol table for whether this ranking holds uniformly across the panel or is driven by a subset of symbols.
 
+That reactive-vs-twap ranking should be read cautiously: the mean gap between them (0.02724) is small relative to their shared across-cell dispersion (sd ≈ 5.24 for both), so this sample does not statistically distinguish reactive's mean shortfall from twap's — the apparent edge is consistent with noise. Only frontloaded's variance reduction (below) is a clearly resolved effect in this data.
+
 A second, mean-independent pattern is visible in both the summary table and the per-symbol plot: **frontloaded** pays a small but consistently POSITIVE mean shortfall with a much SMALLER standard deviation (0.3404) than twap or reactive (5.24 on average) — this holds for every symbol in the panel, not just in the pooled numbers. This is consistent with front-loading trading more own-impact cost (which this model always charges, deterministically) for less exposure to adverse drift (which is the dominant, noisy term for twap/reactive since they spread execution over the full horizon). Neither pattern implies the other is a better trade-off in general — that depends on a risk preference this analysis does not take a position on.
 
 ## Caveats
