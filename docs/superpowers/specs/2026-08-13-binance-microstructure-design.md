@@ -60,7 +60,7 @@ LEARNING.md        # every concept explained as we hit it; interview-prep artifa
 ```
 
 - **Tooling:** Python 3.12, polars (not pandas) for tick-scale data, uv for env, pytest.
-- **Division of labor:** agents build `data/`, `plots/`, test scaffolding, CI. All research code (`signals/`, `estimators/`, notebooks) is written with the user step-by-step — this is the learning content, never delegated.
+- **Division of labor (amended 2026-08-13 at user's direction):** agents build everything, research code included — build-first, learn-after. The learning obligation moves into artifacts: `LEARNING.md` explains every concept and every statistical choice in interview-prep form, and each analysis script carries a narrative explaining what it computes and why. The user reviews/absorbs after each phase lands.
 
 ## 5. Validation strategy
 
