@@ -3,7 +3,8 @@
 Empirical measurement of order-flow memory and price impact on Binance USDT-M perpetual futures,
 from raw tick data. Three classical microstructure results — long-memory order flow, the price
 response function, and order-flow-imbalance linearity — replicated on crypto and benchmarked
-against the published equities literature.
+against the published equities literature, then carried to a **121-symbol cross-section** and a
+**propagator deconvolution** that separates the bare impact kernel from flow memory.
 
 This is a learning-first research project. Every Phase-1 result was chosen because a published
 benchmark exists to check it against; novelty is explicitly not the goal. Each result is reported
@@ -19,7 +20,7 @@ statistics behind every number below, and closes with an interview drill.
 |---|---|
 | Source | [data.binance.vision](https://data.binance.vision) public dumps (free, no account) |
 | Market | USDT-M perpetual futures |
-| Symbols | BTCUSDT, ETHUSDT |
+| Symbols | BTCUSDT, ETHUSDT (Phase 1); a 207-symbol universe, 121 analyzed (Phase 2) |
 | `aggTrades` | **105,147,096** raw prints — BTC + ETH, 2023-06 and 2023-07 |
 | `bookTicker` | **114,231,299** L1 quote updates — ETH, **14 days**, 2023-06-01 to 2023-06-14 |
 | Resolution | millisecond timestamps |
@@ -105,6 +106,56 @@ as suggestive of the right direction rather than a measurement that rejects the 
   moves only 0.2% under a randomized tie-break and stays near baseline under netting.
   [Full results →](results/q1b_zigzag.md)
 
+### Phase 2 — the cross-section and the kernel
+
+Phase 2 does two things Phase 1 could not: it runs the order-flow-memory statistics across a
+**121-symbol cross-section**, and it separates the impact kernel `G` from flow memory `C` with a
+**propagator deconvolution** estimator — closing the "R, not G" gap listed under Phase-1
+limitations.
+
+#### Q4 — long memory is liquidity-invariant; short-lag structure is not
+
+![γ̂ vs activity](results/q4_gamma_vs_activity.png)
+![p_flip vs activity](results/q4_flip_vs_activity.png)
+
+Q1's statistics on every symbol in a 207-symbol universe with ≥ 1M aggressor events in 2023-06 —
+**121 successful, 86 skipped below the threshold, 0 failed**, spanning 1.33 decades of activity.
+The two panels disagree, and that is the result. **γ̂ does not track activity at all: slope
+−0.0112, R² = 0.0003**, moving the fitted line by −0.015 across the whole range against a
+cross-sectional spread of 0.167 — while γ̂ itself varies from **0.065 to 1.429** (median 0.327,
+79 of 121 inside the 0.3–0.7 equities range). **p_flip does track it: slope +0.1114 per decade,
+R² = 0.2632**, climbing from a fitted 0.414 to 0.563 and crossing the 0.5 coin-flip line. Sharpest
+cut: of the 20 most active symbols **8 are anti-persistent** (p_flip > 0.5, equivalently lag-1
+ACF < 0); of the 20 least active, **zero** are. The reading offered — long memory as roughly
+universal order-splitting behaviour, lag-1 structure as mechanical and competitive — is a
+**hypothesis, not a result**. The alternative this data cannot exclude is that p_flip tracks
+*relative tick size*, which correlates with activity; that would make the law a bid-ask-bounce
+artifact. Regression stderrs are heteroskedastic across symbols and are descriptive only, which
+is also why the γ̂ figure carries no per-symbol error bars.
+
+[Full results and caveats →](results/q4_cross_section.md)
+
+#### Q5 — critical balance holds for 12 of 16, and the misses all lean one way
+
+![Kernel panel](results/q5_kernel_panel.png)
+
+The deconvolved kernel exponent β̂ against the diffusivity prediction β = (1−γ)/2, on a 16-symbol
+panel over one week (2023-06-01..07). Deconvolution matters: on synthetic data with a planted
+exponent of 0.35, it recovers **0.3767** where a naive fit to the response function returns
+**0.0633**. Verdict: **12 consistent, 4 violated** (1000PEPEUSDT, OPUSDT, SOLUSDT, ARBUSDT) under
+`|Δ| ≤ 2·max(block_sd, 0.04)`. **The tolerance is not symmetric and the headline must say so.**
+The 0.04 floor is the estimator's own *measured* finite-L bias (β̂ reads +0.03–0.04 too high), and
+because that bias is signed upward, negative deltas are **understated**. **11 of 16 deltas are
+negative, including all 4 violations** (−0.087 to −0.155) — so bias correction would produce more
+violations, not fewer, and 12/16 is the most favourable reading the data supports. Kernels
+decaying slower than critical would imply mildly super-diffusive prices, which sits in unresolved
+tension with Q4's anti-persistent high-activity symbols;
+[LEARNING.md §6.3](LEARNING.md#63-the-critical-balance-test) works through the three ways to read
+that and does not pick one. A violation is also equally consistent with the linear propagator
+simply being the wrong model for those books.
+
+[Full results and caveats →](results/q5_kernel_panel.md)
+
 ## Reproducing from a fresh clone
 
 ### 1. Environment
@@ -121,7 +172,7 @@ Python 3.12+. Dependencies are polars, numpy, matplotlib, httpx; `uv sync` insta
 ### 2. Verify the code before trusting it
 
 ```bash
-uv run pytest -m "not network" -q     # 73 tests: estimators vs synthetic ground truth
+uv run pytest -m "not network" -q     # 90 tests: estimators vs synthetic ground truth
 uv run ruff check src/ tests/
 ```
 
@@ -186,6 +237,33 @@ Q1 is the heaviest — it computes an FFT autocorrelation over 38M events per sy
 the monthly `aggTrades` file covering the requested days plus every daily `bookTicker` file in
 the range, and aborts if more than 1% of events fail to join a prior mid.
 
+### 5. Run the Phase-2 cross-section
+
+Both universes are committed, so these reproduce the figures above exactly.
+`results/universe_2023-06.txt` holds the 207 requested symbols and
+`results/panel_2023-06.txt` the 16-symbol kernel panel.
+
+Q4 needs monthly 2023-06 `aggTrades` for the whole universe (far more than the two symbols synced
+above); Q5 additionally needs daily `bookTicker` for its 16 panel symbols over 2023-06-01..07,
+which `q5_kernel_panel` syncs itself.
+
+```bash
+# Q4: 121-symbol cross-section (207 requested, skips below --min-events)
+uv run python -m microstructure.analyses.q4_cross_section \
+    --root data --out results --symbols-file results/universe_2023-06.txt \
+    --period 2023-06 --min-events 1000000 --max-lag 1000
+
+# Q5: 16-symbol kernel panel, one week
+uv run python -m microstructure.analyses.q5_kernel_panel \
+    --root data --out results --symbols-file results/panel_2023-06.txt \
+    --month 2023-06 --start-day 2023-06-01 --end-day 2023-06-07 --max-lag 300
+```
+
+Q4 processes one symbol at a time and releases each frame before the next, so peak memory is
+bounded by the largest single symbol rather than the universe. Symbols below `--min-events` are
+skipped with a logged reason and any other per-symbol failure is caught and recorded, so neither
+run aborts partway through.
+
 ## Repo map
 
 ```
@@ -200,13 +278,16 @@ src/microstructure/
 ├── estimators/
 │   ├── acf.py          # FFT sign ACF (Wiener-Khinchin) + log-log power-law fit
 │   ├── response.py     # R(ℓ) = E[s_t · (m_{t+ℓ} − m_t)]
-│   └── ofi.py          # Cont-Kukanov-Stoikov OFI + through-origin OLS
+│   ├── ofi.py          # Cont-Kukanov-Stoikov OFI + through-origin OLS
+│   └── propagator.py   # Toeplitz kernel deconvolution + blocked β̂ uncertainty
 ├── analyses/
 │   ├── q0_aggregation_effect.py # → q0_*.md/.json (Phase 1.5 diagnostic)
 │   ├── q1_orderflow_memory.py   # → q1_*.png/.md/.json
 │   ├── q1b_zigzag.py            # → q1b_*.png/.md/.json (Phase 1.5 diagnostic)
 │   ├── q2_response.py           # → q2_*.png/.md/.json
-│   └── q3_ofi.py                # → q3_*.png/.md/.json
+│   ├── q3_ofi.py                # → q3_*.png/.md/.json
+│   ├── q4_cross_section.py      # → q4_*.png/.md/.json/.parquet (Phase 2)
+│   └── q5_kernel_panel.py       # → q5_*.png/.md/.json (Phase 2)
 └── synthetic.py        # series with KNOWN properties, for estimator validation
 
 tests/                  # pytest; estimators checked against synthetic ground truth
@@ -222,16 +303,23 @@ LEARNING.md             # concepts, judgment calls, and the interview drill
 
 Stated plainly, because they bound every number above:
 
-- **Single regime.** Q1 covers two months; Q2 and Q3 a single 14-day window on one symbol.
-  Nothing here establishes that results generalize across periods or volatility regimes.
-- **Optimistic standard errors.** Every stderr reported is OLS, which assumes independent
+- **Single regime.** Q1 covers two months; Q2 and Q3 a single 14-day window on one symbol; Q4 a
+  single month and Q5 a single **7-day** window. Phase 1.5 *measured* these statistics to be
+  regime-dependent, so this is a documented risk rather than a hypothetical one. Nothing here
+  establishes that any result generalizes across periods or volatility regimes.
+- **Optimistic standard errors.** Every Phase-1 stderr is OLS, which assumes independent
   residuals. ACF values at adjacent lags share nearly all their data, and adjacent bars are
-  autocorrelated, so all stated uncertainties are too small. Block-bootstrap intervals are the
-  first queued rigor upgrade.
+  autocorrelated, so all stated uncertainties are too small. Q4's cross-sectional regressions
+  inherit the problem heteroskedastically. Q5 is the exception and the partial fix: it reports a
+  block-bootstrap sd instead, having measured the OLS stderr to understate the true spread by
+  **6.8×**. Block-bootstrap intervals for Q1 and Q3 remain queued.
 - **L1-only book data.** `bookTicker` gives one level, which plausibly explains both the low OFI
-  R² and the depth-scaling exponent falling short of −1.
-- **R, not G.** Q2 measures the response function; the impact kernel is never separated from
-  flow memory.
+  R² and the depth-scaling exponent falling short of −1, and bounds every Q5 mid as well.
+- **Linear-propagator assumption.** Every Q5 β̂ depends on impacts superposing linearly, and the
+  balance relation β = (1−γ)/2 is itself a linear/diffusive prediction. A "violated" verdict
+  cannot distinguish a genuinely different β–γ relationship from a nonlinear impact process.
+- **Survivorship in the cross-section.** Q4's 121 symbols are those clearing 1M events; the 86
+  skipped are all low-activity, so the bottom of the activity regression is a filtered population.
 
 ## Literature
 
@@ -254,6 +342,12 @@ for a project whose goal is learning against published answer keys.
 
 ## Status
 
-Phase 1 (Q1–Q3) complete. Next: block-bootstrap confidence intervals, disjoint-period reruns,
-a Q3 bar-length sweep, and a signed-trade-volume comparison against book OFI — all of which use
-data already on disk. Phase 2 carries the same machinery to a cross-section of Binance perp pairs.
+Phase 1 (Q1–Q3), Phase 1.5 (Q0, Q1b) and Phase 2 (Q4, Q5) complete.
+
+Next, in order of how much it would change the conclusions: the **tick-size regression** that
+would settle whether Q4's p_flip law is real or a bid-ask-bounce proxy; **β fit over disjoint lag
+windows** to resolve whether Q4's anti-persistence and Q5's slow kernels are scale separation or
+estimator contamination; and a **repeat on a disjoint week and month**, since a single window
+cannot distinguish a law from a June. Still queued from Phase 1: block-bootstrap intervals on γ̂
+and the OFI slope, a Q3 bar-length sweep, and a signed-trade-volume comparison against book OFI —
+all using data already on disk.
