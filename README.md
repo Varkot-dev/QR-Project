@@ -94,6 +94,17 @@ as suggestive of the right direction rather than a measurement that rejects the 
 
 [Full results and caveats →](results/q3_results.md)
 
+### Phase 1.5 — diagnostics on the Phase-1 pipeline
+
+- **Q0 — aggregation effect.** Raw-print γ̂ is inflated by +0.29 to +0.50 relative to correctly
+  aggregated γ̂ across all four symbol-months, landing inside the equity range in some cells and
+  overshooting past it in others — a literature-range check alone cannot tell the broken
+  pipeline from the correct one. [Full results →](results/q0_aggregation_effect.md)
+- **Q1b — zigzag tie-break robustness.** The short-lag odd/even alternation in Q1's BTC ACF is
+  real structure, not an artifact of the deterministic same-millisecond tie-break: its amplitude
+  moves only 0.2% under a randomized tie-break and stays near baseline under netting.
+  [Full results →](results/q1b_zigzag.md)
+
 ## Reproducing from a fresh clone
 
 ### 1. Environment
@@ -110,7 +121,7 @@ Python 3.12+. Dependencies are polars, numpy, matplotlib, httpx; `uv sync` insta
 ### 2. Verify the code before trusting it
 
 ```bash
-uv run pytest -m "not network" -q     # 67 tests: estimators vs synthetic ground truth
+uv run pytest -m "not network" -q     # 73 tests: estimators vs synthetic ground truth
 uv run ruff check src/ tests/
 ```
 
@@ -191,7 +202,9 @@ src/microstructure/
 │   ├── response.py     # R(ℓ) = E[s_t · (m_{t+ℓ} − m_t)]
 │   └── ofi.py          # Cont-Kukanov-Stoikov OFI + through-origin OLS
 ├── analyses/
+│   ├── q0_aggregation_effect.py # → q0_*.md/.json (Phase 1.5 diagnostic)
 │   ├── q1_orderflow_memory.py   # → q1_*.png/.md/.json
+│   ├── q1b_zigzag.py            # → q1b_*.png/.md/.json (Phase 1.5 diagnostic)
 │   ├── q2_response.py           # → q2_*.png/.md/.json
 │   └── q3_ofi.py                # → q3_*.png/.md/.json
 └── synthetic.py        # series with KNOWN properties, for estimator validation
