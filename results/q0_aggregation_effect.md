@@ -2,7 +2,7 @@
 
 ## Punchline
 
-**A broken pipeline that skips aggressor aggregation impersonates a successful replication.** Raw-print gamma lands inside or above the equities/futures range (0.3-0.7, Bouchaud et al. 2004) in every symbol-month tested here, while the correctly aggregated gamma from the same data moves lower or further out of range. Checking 'does gamma fall in the literature range' cannot distinguish the correct pipeline from the broken one -- both checks pass, for different reasons, on different numbers, and the broken one is the one that looks more convincing.
+**A broken pipeline that skips aggressor aggregation impersonates a successful replication.** In every symbol-month tested here, raw-print gamma is inflated by roughly +0.29 to +0.50 relative to the correctly aggregated gamma from the same data -- landing INSIDE the equities/futures range (0.3-0.7, Bouchaud et al. 2004) in half the cells below and OVERSHOOTING past it in the other half, while the aggregated gamma moves lower or further out of range in every cell. Checking 'does gamma fall in the literature range' cannot by itself distinguish the correct pipeline from the broken one: both checks pass, for different reasons, on different numbers, and it is the broken pipeline that more often looks like a clean replication.
 
 ## Methodology
 
