@@ -1,15 +1,20 @@
 """Tests for the propagator kernel deconvolution estimator (Phase 2, Task 1).
 
-Contract under test (see task-1-brief.md):
+Contract under test (see task-1-brief.md and the follow-up review fixes):
 1. White-noise signs: C = delta, so kappa recovered == b exactly (up to noise
    used to build the synthetic mids).
 2. Long-memory signs (fractional_signs d=0.35): plant a power-law kernel
    G0(l) = l^(-0.35), build mids by convolution, estimate b and the sign ACF
-   from the DATA, deconvolve, and recover beta close to 0.35 via
-   fit_power_law on the cumulative kernel. This is the key test: it also
-   shows that the naive response function (no deconvolution) does NOT
-   recover 0.35 as well as the deconvolved kernel does, on the same data.
-3. Shape guards: mismatched lengths and singular ACF both raise ValueError.
+   from the DATA (not the theory), deconvolve, and recover beta close to
+   0.35 via fit_power_law on the cumulative kernel, across multiple seeds.
+   This is the key test: it also shows that the naive response function (no
+   deconvolution) does NOT recover 0.35 as well as the deconvolved kernel
+   does, on the same data.
+3. Guards: mismatched lengths, singular ACF, unnormalized ACF (acf[0] != 1),
+   and too-few-samples-per-lag all raise ValueError.
+4. kernel_exponent_blocked reports a block-bootstrap uncertainty (block_sd)
+   that must be used instead of fit_power_law's OLS stderr, which is known
+   to badly understate beta_hat's true uncertainty.
 """
 from __future__ import annotations
 
@@ -20,6 +25,7 @@ from microstructure.estimators.acf import fit_power_law, sign_acf
 from microstructure.estimators.propagator import (
     cumulative_kernel,
     deconvolve_kernel,
+    kernel_exponent_blocked,
     sign_price_cross_cov,
 )
 from microstructure.estimators.response import response_function
@@ -53,6 +59,28 @@ class TestSignPriceCrossCov:
         with pytest.raises(ValueError):
             sign_price_cross_cov(np.ones(10), np.ones(9), max_lag=2)
 
+    def test_mean_centering_matters_for_directional_flow(self):
+        """MEDIUM 1: both series must be mean-centered like sign_acf.
+
+        With directional (non-zero-mean) signs and dm both held constant,
+        an uncentered cross-cov would equal mean(dm)*mean(signs); after
+        centering it must be (near) zero since there is no genuine
+        covariation once the means are removed.
+        """
+        n = 5000
+        rng = np.random.default_rng(42)
+        # Directional flow: signs biased towards +1, non-trivial mean.
+        signs = np.where(rng.random(n) < 0.8, 1.0, -1.0)
+        dm = 0.5 + 0.01 * rng.standard_normal(n)  # mean 0.5, weak noise, no real link to signs
+
+        assert abs(signs.mean()) > 0.4  # confirm this is a directional-flow scenario
+        assert abs(dm.mean()) > 0.3
+
+        b = sign_price_cross_cov(signs, dm, max_lag=5)
+        # Centered cross-covariance with no real signs-dm link should be ~0,
+        # not mean(dm)*mean(signs) ~= 0.5*0.6 = 0.3 (mean^2 discrepancy).
+        assert np.all(np.abs(b) < 0.05)
+
 
 class TestDeconvolveWhiteNoise:
     def test_white_noise_signs_kappa_equals_b(self):
@@ -81,27 +109,18 @@ class TestDeconvolveWhiteNoise:
         b = sign_price_cross_cov(signs_aligned, dm, max_lag=L)
         acf = sign_acf(signs_aligned, max_lag=L - 1)
 
-        kappa = deconvolve_kernel(b, acf)
+        kappa = deconvolve_kernel(b, acf, n_samples=n)
         assert kappa.shape == b.shape
         # Since signs are iid, acf[k] ~ 0 for k>0, so kappa ~= b == kappa0.
         assert np.max(np.abs(kappa - kappa0)) < 0.02
 
 
 class TestDeconvolveLongMemory:
-    def test_recovers_power_law_kernel_and_beats_naive_response(self):
-        """KEY TEST: deconvolution recovers beta=0.35 kernel; naive response does not.
-
-        Per the brief and Phase-1's kernel construction: mids are built by
-        convolving signs directly with the power-law kernel
-        G0(l) = l^(-0.35), l>=1 (truncated to n_lags terms). kappa0, the
-        thing sign_price_cross_cov/deconvolve_kernel actually recover, is
-        the first difference of G0. cumulative_kernel then undoes that
-        differencing, so fitting fit_power_law on the recovered cumulative
-        kernel should recover exponent ~0.35.
-        """
+    def _run_recovery(self, seed: int):
+        """Shared machinery for the key long-memory recovery test, per seed."""
         n = 300_000
         d = 0.35
-        signs = fractional_signs(n, d=d, seed=20)
+        signs = fractional_signs(n, d=d, seed=seed)
 
         # Plant G0(l) = l^(-0.35) as the convolution kernel itself (mid_t
         # construction from Phase 1), truncated at n_lags terms for speed.
@@ -117,7 +136,7 @@ class TestDeconvolveLongMemory:
         b = sign_price_cross_cov(signs_aligned, dm, max_lag=L)
         acf = sign_acf(signs_aligned, max_lag=L - 1)
 
-        kappa = deconvolve_kernel(b, acf)
+        kappa = deconvolve_kernel(b, acf, n_samples=signs_aligned.size)
         G = cumulative_kernel(kappa)
         assert G.shape == (L,)
 
@@ -129,15 +148,33 @@ class TestDeconvolveLongMemory:
         naive_fit = fit_power_law(np.abs(r), lo=5, hi=150)
         naive_exponent = naive_fit.exponent
 
-        target = 0.35
-        deconv_err = abs(beta_hat - target)
-        naive_err = abs(naive_exponent - target)
+        return beta_hat, naive_exponent
 
-        assert deconv_err < 0.07, f"beta_hat={beta_hat} not within 0.07 of {target}"
-        assert naive_err > deconv_err, (
-            f"naive response exponent {naive_exponent} should be farther from "
-            f"{target} than deconvolved beta_hat={beta_hat}"
-        )
+    def test_recovers_power_law_kernel_and_beats_naive_response(self):
+        """KEY TEST: deconvolution recovers beta=0.35 kernel across seeds;
+        naive response does not, and the recovery is stable across seeds
+        (LOW 2: loop 3 seeds, check per-seed tolerance AND across-seed sd).
+        """
+        target = 0.35
+        seeds = [20, 21, 22]
+        beta_hats = []
+        for seed in seeds:
+            beta_hat, naive_exponent = self._run_recovery(seed)
+            beta_hats.append(beta_hat)
+
+            deconv_err = abs(beta_hat - target)
+            naive_err = abs(naive_exponent - target)
+
+            assert deconv_err < 0.07, (
+                f"seed={seed}: beta_hat={beta_hat} not within 0.07 of {target}"
+            )
+            assert naive_err > deconv_err, (
+                f"seed={seed}: naive response exponent {naive_exponent} should be "
+                f"farther from {target} than deconvolved beta_hat={beta_hat}"
+            )
+
+        sd = float(np.std(np.array(beta_hats), ddof=1))
+        assert sd < 0.03, f"across-seed sd of beta_hat too large: {sd} (values={beta_hats})"
 
 
 class TestCumulativeKernel:
@@ -149,12 +186,12 @@ class TestCumulativeKernel:
         assert np.allclose(G, [0.0, 1.0, 3.0, 6.0])
 
 
-class TestShapeGuards:
+class TestGuards:
     def test_mismatched_lengths_raises(self):
         b = np.ones(10)
         acf = np.ones(5)  # wrong length: must be len(b)
         with pytest.raises(ValueError):
-            deconvolve_kernel(b, acf)
+            deconvolve_kernel(b, acf, n_samples=10_000)
 
     def test_singular_acf_raises(self):
         # Constant ACF of 1 at all lags => every row of the Toeplitz matrix
@@ -163,4 +200,62 @@ class TestShapeGuards:
         b = np.ones(L)
         acf = np.ones(L)
         with pytest.raises(ValueError):
-            deconvolve_kernel(b, acf)
+            deconvolve_kernel(b, acf, n_samples=10_000)
+
+    def test_unnormalized_acf_raises(self):
+        """MEDIUM 2: acf[0] must equal 1.0 (normalized ACF), else ValueError."""
+        L = 10
+        b = np.ones(L)
+        acf = np.zeros(L)
+        acf[0] = 2.0  # raw autocovariance, not normalized
+        with pytest.raises(ValueError):
+            deconvolve_kernel(b, acf, n_samples=10_000)
+
+    def test_low_sample_to_lag_ratio_raises(self):
+        """HIGH 1: n_samples/len(b) below the 100 floor must raise, even
+        though the Toeplitz matrix here is well-conditioned (an identity-
+        like near-diagonal ACF), demonstrating the rank/condition checks
+        alone cannot catch this failure mode.
+        """
+        L = 300
+        rng = np.random.default_rng(99)
+        acf = np.zeros(L)
+        acf[0] = 1.0
+        acf[1:] = 0.01 * rng.standard_normal(L - 1)  # tiny, near-delta ACF
+        b = rng.standard_normal(L)
+        n_samples = 1_000  # ratio = 1000/300 = 3.33, far below 100
+
+        with pytest.raises(ValueError, match="n_samples"):
+            deconvolve_kernel(b, acf, n_samples=n_samples)
+
+    def test_low_sample_ratio_bypassed_with_allow_low_sample(self):
+        L = 10
+        rng = np.random.default_rng(1)
+        acf = np.zeros(L)
+        acf[0] = 1.0
+        acf[1:] = 0.01 * rng.standard_normal(L - 1)
+        b = rng.standard_normal(L)
+        # Should not raise when explicitly bypassed.
+        kappa = deconvolve_kernel(b, acf, n_samples=50, allow_low_sample=True)
+        assert kappa.shape == (L,)
+
+
+class TestKernelExponentBlocked:
+    def test_returns_n_blocks_exponents_with_positive_sd_and_accurate_full_sample(self):
+        n = 300_000
+        d = 0.35
+        signs = fractional_signs(n, d=d, seed=20)
+
+        n_lags = 2000
+        ell = np.arange(1, n_lags + 1, dtype=float)
+        G0 = ell**-0.35
+        mids = _mids_from_kernel(signs, np.concatenate(([0.0], G0)))
+        dm = np.diff(mids)
+        signs_aligned = signs[:-1]
+
+        result = kernel_exponent_blocked(signs_aligned, dm, max_lag=300, n_blocks=5, fit_lo=5)
+
+        assert len(result.block_exponents) == 5
+        assert result.block_sd > 0.0
+        assert result.n_samples == signs_aligned.size
+        assert abs(result.exponent - 0.35) < 0.07
