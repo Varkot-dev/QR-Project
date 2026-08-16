@@ -146,7 +146,9 @@ def _symbol_record(
     dm = np.diff(mids)
     signs_aligned = signs[:-1]
 
-    blocked = kernel_exponent_blocked(signs_aligned, dm, max_lag=max_lag)
+    blocked = kernel_exponent_blocked(
+        signs_aligned, dm, max_lag=max_lag, fit_lo=BETA_FIT_LO, fit_hi=max_lag // 2
+    )
     G = _symbol_kernel(signs_aligned, dm, max_lag)
     R = response_function(signs, mids, max_lag)
 
@@ -335,7 +337,7 @@ def _write_results_md(out_dir: Path, result: dict) -> None:
             lines.append(
                 f"| {r['symbol']} | {r['n_events']:,} | {r['gamma_week']:.4f} | "
                 f"{r['beta']:.4f} | {r['beta_block_sd']:.4f} | {r['balance_delta']:+.4f} | "
-                f"{r['verdict']} | {r['R1']:.6f} | {r['drop_rate']:.4%} |"
+                f"{r['verdict']} | {r['R1']:.3e} | {r['drop_rate']:.4%} |"
             )
         lines.append("")
     else:
@@ -370,9 +372,10 @@ def _write_results_md(out_dir: Path, result: dict) -> None:
                 f"{result['n_violated']} do not — critical balance holds for SOME but "
                 "not all of the panel. Whether the split correlates with activity "
                 "(n_events) or other symbol characteristics is visible in the panel "
-                "table and right-hand plot above; no such correlation is asserted here "
-                "beyond what the table shows, since a resolution below "
-                f"{len(records)} points is not enough to fit a reliable trend."
+                "table above (and in the companion plot, see README); no such "
+                "correlation is asserted here beyond what the table shows, since a "
+                f"resolution below {len(records)} points is not enough to fit a "
+                "reliable trend."
             )
     else:
         lines.append("No successful symbols in this run — no finding to report.")

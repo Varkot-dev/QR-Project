@@ -18,26 +18,26 @@ Requested: 16. Successful: 16. Failed: 0. Of the successful symbols: **12 consis
 
 | symbol | n_events | γ̂_week | β̂ | β̂ block_sd | Δ (balance) | verdict | R(1) | drop_rate |
 |---|---|---|---|---|---|---|---|---|
-| BTCUSDT | 4,703,378 | 0.3603 | 0.2399 | 0.0601 | -0.0799 | consistent | 0.112142 | 0.0000% |
-| ETHUSDT | 3,112,419 | 0.2244 | 0.2895 | 0.0614 | -0.0983 | consistent | 0.010752 | 0.0000% |
-| 1000PEPEUSDT | 2,060,998 | 0.4539 | 0.1625 | 0.0416 | -0.1106 | violated | 0.000000 | 0.0000% |
-| XRPUSDT | 1,608,574 | 0.3524 | 0.3633 | 0.0615 | +0.0395 | consistent | 0.000010 | 0.0000% |
-| LTCUSDT | 1,351,376 | 0.4184 | 0.3363 | 0.0706 | +0.0455 | consistent | 0.002099 | 0.0000% |
-| OPUSDT | 1,279,604 | 0.4215 | 0.1343 | 0.0655 | -0.1549 | violated | 0.000076 | 0.0000% |
-| SOLUSDT | 1,117,502 | 0.3038 | 0.2608 | 0.0218 | -0.0873 | violated | 0.000646 | 0.0000% |
-| INJUSDT | 1,084,554 | 0.4282 | 0.2509 | 0.0493 | -0.0350 | consistent | 0.000509 | 0.0000% |
-| SUIUSDT | 1,045,883 | 0.4433 | 0.2100 | 0.0370 | -0.0684 | consistent | 0.000060 | 0.0000% |
-| ARBUSDT | 911,294 | 0.3436 | 0.2315 | 0.0346 | -0.0967 | violated | 0.000052 | 0.0000% |
-| DOGEUSDT | 874,041 | 0.2109 | 0.4802 | 0.2025 | +0.0856 | consistent | 0.000001 | 0.0000% |
-| EDUUSDT | 754,422 | 0.4326 | 0.1697 | 0.0571 | -0.1140 | consistent | 0.000092 | 0.0000% |
-| APTUSDT | 667,892 | 0.5123 | 0.1911 | 0.0502 | -0.0527 | consistent | 0.000488 | 0.0000% |
-| LINKUSDT | 514,284 | 0.3999 | 0.4183 | 0.0840 | +0.1183 | consistent | 0.000166 | 0.0000% |
-| IDUSDT | 509,325 | 0.4837 | 0.2333 | 0.0508 | -0.0249 | consistent | 0.000046 | 0.0000% |
-| BCHUSDT | 401,825 | 0.3565 | 0.3827 | 0.0412 | +0.0609 | consistent | 0.003580 | 0.0000% |
+| BTCUSDT | 4,703,378 | 0.3603 | 0.2399 | 0.0601 | -0.0799 | consistent | 1.121e-01 | 0.0000% |
+| ETHUSDT | 3,112,419 | 0.2244 | 0.2895 | 0.0614 | -0.0983 | consistent | 1.075e-02 | 0.0000% |
+| 1000PEPEUSDT | 2,060,998 | 0.4539 | 0.1625 | 0.0416 | -0.1106 | violated | 6.908e-08 | 0.0000% |
+| XRPUSDT | 1,608,574 | 0.3524 | 0.3633 | 0.0615 | +0.0395 | consistent | 9.731e-06 | 0.0000% |
+| LTCUSDT | 1,351,376 | 0.4184 | 0.3363 | 0.0706 | +0.0455 | consistent | 2.099e-03 | 0.0000% |
+| OPUSDT | 1,279,604 | 0.4215 | 0.1343 | 0.0655 | -0.1549 | violated | 7.643e-05 | 0.0000% |
+| SOLUSDT | 1,117,502 | 0.3038 | 0.2608 | 0.0218 | -0.0873 | violated | 6.460e-04 | 0.0000% |
+| INJUSDT | 1,084,554 | 0.4282 | 0.2509 | 0.0493 | -0.0350 | consistent | 5.091e-04 | 0.0000% |
+| SUIUSDT | 1,045,883 | 0.4433 | 0.2100 | 0.0370 | -0.0684 | consistent | 5.983e-05 | 0.0000% |
+| ARBUSDT | 911,294 | 0.3436 | 0.2315 | 0.0346 | -0.0967 | violated | 5.182e-05 | 0.0000% |
+| DOGEUSDT | 874,041 | 0.2109 | 0.4802 | 0.2025 | +0.0856 | consistent | 1.476e-06 | 0.0000% |
+| EDUUSDT | 754,422 | 0.4326 | 0.1697 | 0.0571 | -0.1140 | consistent | 9.244e-05 | 0.0000% |
+| APTUSDT | 667,892 | 0.5123 | 0.1911 | 0.0502 | -0.0527 | consistent | 4.884e-04 | 0.0000% |
+| LINKUSDT | 514,284 | 0.3999 | 0.4183 | 0.0840 | +0.1183 | consistent | 1.660e-04 | 0.0000% |
+| IDUSDT | 509,325 | 0.4837 | 0.2333 | 0.0508 | -0.0249 | consistent | 4.552e-05 | 0.0000% |
+| BCHUSDT | 401,825 | 0.3565 | 0.3827 | 0.0412 | +0.0609 | consistent | 3.580e-03 | 0.0000% |
 
 ## Findings
 
-12 of 16 symbols (75%) land within the balance band and 4 do not — critical balance holds for SOME but not all of the panel. Whether the split correlates with activity (n_events) or other symbol characteristics is visible in the panel table and right-hand plot above; no such correlation is asserted here beyond what the table shows, since a resolution below 16 points is not enough to fit a reliable trend.
+12 of 16 symbols (75%) land within the balance band and 4 do not — critical balance holds for SOME but not all of the panel. Whether the split correlates with activity (n_events) or other symbol characteristics is visible in the panel table above (and in the companion plot, see README); no such correlation is asserted here beyond what the table shows, since a resolution below 16 points is not enough to fit a reliable trend.
 
 ## Caveats
 
