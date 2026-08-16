@@ -162,9 +162,11 @@ BTCUSDT's known mainnet tick, not verified symbol-by-symbol against mainnet).
 
 The deconvolved kernel exponent β̂ against the diffusivity prediction β = (1−γ)/2, on a 16-symbol
 panel over one week (2023-06-01..07). Deconvolution matters: on synthetic data with a planted
-exponent of 0.35, it recovers **0.3767** where a naive fit to the response function returns
-**0.0633**. Verdict: **12 consistent, 4 violated** (1000PEPEUSDT, OPUSDT, SOLUSDT, ARBUSDT) under
-`|Δ| ≤ 2·max(block_sd, 0.04)`. **The tolerance is not symmetric and the headline must say so.**
+exponent of 0.35, across the three seeds `tests/estimators/test_propagator.py` runs, it recovers
+**0.377–0.397** where a naive fit to the response function returns only **0.063–0.125** (seed 20
+alone: 0.3766 vs. 0.0633). Verdict: **12 consistent, 4 violated** (1000PEPEUSDT, OPUSDT, SOLUSDT,
+ARBUSDT) under `|Δ| ≤ 2·max(block_sd, 0.04)`. **The tolerance is not symmetric and the headline
+must say so.**
 The 0.04 floor is the estimator's own *measured* finite-L bias (β̂ reads +0.03–0.04 too high), and
 because that bias is signed upward, negative deltas are **understated**. **11 of 16 deltas are
 negative, including all 4 violations** (−0.087 to −0.155) — so bias correction would produce more

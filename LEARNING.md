@@ -839,12 +839,15 @@ flow-memory structure, would produce the response I actually see?"
 
 **Why the naive read is not a rough approximation but a wrong answer.** On synthetic data with a
 *planted* kernel exponent of 0.35 (fractional signs at d = 0.35, mids built by convolving with
-`G0(ℓ) = ℓ^(−0.35)`), the two methods on the same dataset:
+`G0(ℓ) = ℓ^(−0.35)`), the two methods on the same dataset, across the three seeds
+`tests/estimators/test_propagator.py` runs:
 
-| Method | recovered exponent | error |
+| Method | recovered exponent (range across seeds 20-22) | error (range) |
 |---|---|---|
-| Deconvolved β̂ | **0.3767** | 0.0267 |
-| Naive fit on the response function | **0.0633** | 0.2867 |
+| Deconvolved β̂ | **0.377–0.397** | 0.027–0.047 |
+| Naive fit on the response function | **0.063–0.125** | 0.225–0.287 |
+
+(Seed 20 alone: deconvolved 0.3766, error 0.0266; naive 0.0633, error 0.2867.)
 
 The naive read is off by an order of magnitude in error — it returns something nearly flat,
 because long-memory flow makes the raw response *rise* rather than track the decaying bare
@@ -877,8 +880,9 @@ opposite directions.
 **Law 1 — γ is liquidity-invariant.** Regressing γ̂ on log₁₀(activity): slope **−0.0112**
 (stderr 0.0547), **R² = 0.0003**. That is not a weak relationship; it is the absence of one.
 Across the full observed activity range the fitted line moves γ̂ by **−0.0149**, against a
-cross-sectional standard deviation of **0.1674** — the trend explains about a ninth of one
-percent of the spread. Meanwhile γ̂ itself varies enormously: median **0.327**, range **0.065**
+cross-sectional standard deviation of **0.1674** — the fitted line's movement is about a ninth
+of one standard deviation (R² says the trend explains about 0.03% of the variance). Meanwhile
+γ̂ itself varies enormously: median **0.327**, range **0.065**
 (BNXUSDT) to **1.429** (GALABUSD), IQR 0.278–0.376, with **79 of 121** landing inside the
 0.3–0.7 equities range. So symbols differ a lot in long memory, and how much they trade predicts
 essentially none of it.
