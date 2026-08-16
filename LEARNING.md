@@ -108,6 +108,13 @@ comfortably inside the equity range of 0.3–0.7 for an entirely mechanical reas
 headline finding of Q1 would have been an artifact of not merging prints.** That is the single
 best answer available to "what breaks if you skip this step".
 
+This contrast is no longer only a fact stated in prose here: [`results/q0_aggregation_effect.md`
+→](results/q0_aggregation_effect.md) is a committed, re-runnable artifact (`microstructure.analyses.q0_aggregation_effect`)
+that recomputes the raw-vs-aggregated gamma table above for all four symbol-month cells (BTC and
+ETH, 2023-06 and 2023-07). The pattern generalizes: raw-print γ̂ is inflated by +0.29 to +0.50
+relative to aggregated γ̂ in every cell, and whether the inflated number lands inside [0.3, 0.7]
+or overshoots past it depends on the symbol-month — BTC's raw γ̂ reaches as high as 0.96.
+
 ### What the aggregation does
 
 `to_aggressor_events` groups by `(ts, is_buyer_maker)` and produces one row per aggressor
@@ -268,6 +275,59 @@ differ" are not separated by this data.
 The last one deserves emphasis because it undercuts the other three: with a single two-month
 window per symbol and no confidence interval that accounts for autocorrelation, the honest
 statement is that ETH's γ̂ is lower **in this sample**, and the mechanism is open.
+
+### Phase-1.5 diagnostics: the short-lag zigzag, and answering candidate #4 above
+
+Two follow-up checks, both committed as re-runnable artifacts rather than left as prose claims.
+
+**Is the short-lag ACF zigzag a tie-break artifact?** Q1's log-log ACF plot shows a visible
+odd/even alternation at short lags — negative ACF(1), strongly positive ACF(2) — and
+`to_aggressor_events` breaks same-millisecond, opposite-side ties deterministically (sells
+before buys). [`results/q1b_zigzag.md` →](results/q1b_zigzag.md) tests whether that deterministic
+sort manufactures the pattern, on BTCUSDT 2023-06. Three variants of the sign series are
+compared at lags 1–10: the baseline; the same series with same-timestamp pairs randomly
+reordered (p=0.5, fixed seed); and the same series with same-timestamp opposite-sign groups
+netted into one event. **Verdict: real structure, not an artifact.** The zigzag amplitude
+(mean ACF at even lags minus mean ACF at odd lags) is 0.138174 at baseline, moves to 0.137872
+under randomization (a 0.22% change), and stays at 0.128335 under netting (a 7.12% change) —
+it survives both perturbations essentially intact. A sanity check explains why the tie-break
+can't be the cause: only 1.20% of consecutive event pairs share a millisecond timestamp in the
+first place, far too few to produce a ~0.14 alternation. This is consistent with genuine market
+structure (e.g. bid-ask bounce or interleaved liquidity-taking reversals), not a sorting
+convention. One thing this analysis does **not** establish: whether the alternation persists
+*past* lag 10 into Q1's [10, 500] fit window — it only measures lags 1–10, entirely at or before
+the window's start, so "the fit is unaffected" is a plausible inference from where the fit
+window begins, not a measurement extending into it.
+
+**Is ETH's low γ̂ = 0.238 a stable property of ETH, or a regime artifact?** Candidate #4 above
+names this as the cheapest open test — re-run on non-overlapping periods — and it has now been
+run. Splitting ETHUSDT into ISO weeks across June–July 2023 gives:
+
+| period | γ̂ | stderr | n_events |
+|---|---|---|---|
+| week 22 (Jun 1–4, pre-SEC-suit) | 0.1976 | 0.0010 | 1,485,486 |
+| week 23 | 0.2906 | 0.0022 | 3,433,795 |
+| week 24 | 0.3074 | 0.0026 | 3,141,900 |
+| week 25 | 0.3059 | 0.0025 | 3,513,709 |
+| week 26 (Jun 26–Jul 2) | 0.3156 | 0.0018 | 3,406,889 |
+| week 27 | 0.2275 | 0.0012 | 2,765,846 |
+| week 28 | 0.2041 | 0.0016 | 2,978,800 |
+| week 29 | 0.2138 | 0.0016 | 2,517,441 |
+| week 30 | 0.1795 | 0.0011 | 2,225,679 |
+
+(Week 31 — July 31 only, 303,921 events — was skipped for falling under the 1M-event
+threshold.) **Verdict: regime-driven, not robust.** The weekly γ̂ values split cleanly in time:
+weeks 24–26 (mid/late June, after the Jun 5–6 SEC filings against Binance and Coinbase) sit at
+0.306–0.316, straddling the 0.3 equity-range boundary, while every July week (27–30) falls to
+0.180–0.228 and pre-suit week 22 sits at 0.198. Month-level BTC confirms the same market-wide
+June elevation (γ̂ = 0.462 in June vs 0.326 in July). So the headline ETH γ̂ = 0.238 is a blend of
+two different regimes, not a single stable number — the "regime" explanation from candidate #4 is
+the one the data actually supports, at least directionally; volatility and volume were not
+controlled for, so the SEC-filing link is suggestive, not established causally. This weekly
+breakdown was produced by a scratch script (not yet a committed `q1_orderflow_memory`-style CLI
+analysis with its own results artifact); it reuses `sign_acf` and `fit_power_law` exactly as Q1
+does, over the same [10, 500] fit window, so the numbers are directly comparable to Q1's
+headline γ̂ values.
 
 ---
 
