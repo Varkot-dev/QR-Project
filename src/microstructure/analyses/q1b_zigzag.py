@@ -254,7 +254,8 @@ def _write_results_md(out_dir: Path, result: dict) -> None:
     )
     lines.append("")
     lines.append(
-        "**This does not affect Q1's headline gamma fits.** Q1's power-law fit window starts "
+        "**This is consistent with Q1's headline gamma fits being unaffected, though not "
+        "directly measured.** Q1's power-law fit window starts "
         "at lag 10 (`fit_power_law(..., lo=10, ...)`); the zigzag reported here is measured "
         "over lags 1-10, i.e. entirely at or before the "
         "start of the fit window, not inside it. Whether the alternation itself persists "
