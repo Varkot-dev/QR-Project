@@ -1,0 +1,997 @@
+{
+  "period": "2023-06",
+  "n_q4_symbols": 121,
+  "n_usable": 111,
+  "n_skipped": 10,
+  "symbols": [
+    {
+      "symbol": "BTCUSDT",
+      "n_events": 21816890,
+      "p_flip": 0.5838068846571113,
+      "tick_size": 0.1,
+      "mean_price": 27943.468484047735,
+      "rel_tick": 3.578653811608521e-06
+    },
+    {
+      "symbol": "ETHUSDT",
+      "n_events": 14239099,
+      "p_flip": 0.48578533555987885,
+      "tick_size": 0.01,
+      "mean_price": 1818.31054050068,
+      "rel_tick": 5.49961064255089e-06
+    },
+    {
+      "symbol": "1000PEPEUSDT",
+      "n_events": 12675042,
+      "p_flip": 0.5036004222787129,
+      "tick_size": 1e-07,
+      "mean_price": 0.0013383409415376403,
+      "rel_tick": 7.471937597986688e-05
+    },
+    {
+      "symbol": "BCHUSDT",
+      "n_events": 10755244,
+      "p_flip": 0.5149906887273491,
+      "tick_size": 0.01,
+      "mean_price": 215.21949271047868,
+      "rel_tick": 4.646419278318983e-05
+    },
+    {
+      "symbol": "TOMOUSDT",
+      "n_events": 9258867,
+      "p_flip": 0.46737861850468515,
+      "tick_size": 0.0001,
+      "mean_price": 1.37019297035715,
+      "rel_tick": 7.298242084392998e-05
+    },
+    {
+      "symbol": "MTLUSDT",
+      "n_events": 8611397,
+      "p_flip": 0.4945511738166495,
+      "tick_size": 0.0001,
+      "mean_price": 1.4112347965035679,
+      "rel_tick": 7.085993078384755e-05
+    },
+    {
+      "symbol": "WAVESUSDT",
+      "n_events": 6269680,
+      "p_flip": 0.46233595053271465,
+      "tick_size": 0.0001,
+      "mean_price": 2.1443697007945706,
+      "rel_tick": 4.663374975077581e-05
+    },
+    {
+      "symbol": "LINAUSDT",
+      "n_events": 8757826,
+      "p_flip": 0.6383018614781638,
+      "tick_size": 1e-05,
+      "mean_price": 0.016530155202226626,
+      "rel_tick": 0.0006049549975582197
+    },
+    {
+      "symbol": "SOLUSDT",
+      "n_events": 6820337,
+      "p_flip": 0.46054343950210075,
+      "tick_size": 0.01,
+      "mean_price": 16.980014655820373,
+      "rel_tick": 0.0005889276424488963
+    },
+    {
+      "symbol": "XRPUSDT",
+      "n_events": 7617768,
+      "p_flip": 0.6486428371988799,
+      "tick_size": 0.0001,
+      "mean_price": 0.5021121514118884,
+      "rel_tick": 0.00019915869336922072
+    },
+    {
+      "symbol": "SUIUSDT",
+      "n_events": 6074349,
+      "p_flip": 0.49146031804565693,
+      "tick_size": 0.0001,
+      "mean_price": 0.7500056783539492,
+      "rel_tick": 0.00013333232385582972
+    },
+    {
+      "symbol": "BNBUSDT",
+      "n_events": 6122425,
+      "p_flip": 0.4851060625660686,
+      "tick_size": 0.01,
+      "mean_price": 249.23521358861782,
+      "rel_tick": 4.012274130936321e-05
+    },
+    {
+      "symbol": "ALPHAUSDT",
+      "n_events": 4736244,
+      "p_flip": 0.4337575162423043,
+      "tick_size": 1e-05,
+      "mean_price": 0.11788439147263514,
+      "rel_tick": 8.482887238147496e-05
+    },
+    {
+      "symbol": "OPUSDT",
+      "n_events": 5208936,
+      "p_flip": 0.43121674584152037,
+      "tick_size": 0.0001,
+      "mean_price": 1.2985238376985768,
+      "rel_tick": 7.701052310078019e-05
+    },
+    {
+      "symbol": "LTCUSDT",
+      "n_events": 5400099,
+      "p_flip": 0.5544823445796725,
+      "tick_size": 0.01,
+      "mean_price": 87.96776736582503,
+      "rel_tick": 0.0001136780016072676
+    },
+    {
+      "symbol": "1000LUNCUSDT",
+      "n_events": 4196777,
+      "p_flip": 0.5179823750421753,
+      "tick_size": 1e-05,
+      "mean_price": 0.09475169716835859,
+      "rel_tick": 0.00010553900667585513
+    },
+    {
+      "symbol": "INJUSDT",
+      "n_events": 4557308,
+      "p_flip": 0.47808124403293434,
+      "tick_size": 0.001,
+      "mean_price": 6.914317416458121,
+      "rel_tick": 0.00014462743605315315
+    },
+    {
+      "symbol": "ARBUSDT",
+      "n_events": 4308450,
+      "p_flip": 0.4632195948008204,
+      "tick_size": 0.0001,
+      "mean_price": 1.0986857291056051,
+      "rel_tick": 9.101783826882496e-05
+    },
+    {
+      "symbol": "LDOUSDT",
+      "n_events": 3762036,
+      "p_flip": 0.39193388684581615,
+      "tick_size": 0.0001,
+      "mean_price": 2.0081845417593502,
+      "rel_tick": 4.9796220377431556e-05
+    },
+    {
+      "symbol": "STXUSDT",
+      "n_events": 4075254,
+      "p_flip": 0.46493677815831314,
+      "tick_size": 0.0001,
+      "mean_price": 0.6745460447897969,
+      "rel_tick": 0.00014824784871603862
+    },
+    {
+      "symbol": "ETCUSDT",
+      "n_events": 3656191,
+      "p_flip": 0.43485650362809375,
+      "tick_size": 0.001,
+      "mean_price": 17.68864309622759,
+      "rel_tick": 5.653344886659324e-05
+    },
+    {
+      "symbol": "KAVAUSDT",
+      "n_events": 3391557,
+      "p_flip": 0.4542849948519205,
+      "tick_size": 1e-05,
+      "mean_price": 0.9767647316349798,
+      "rel_tick": 1.0237879886655278e-05
+    },
+    {
+      "symbol": "ARPAUSDT",
+      "n_events": 3793737,
+      "p_flip": 0.4861917118112594,
+      "tick_size": 1e-06,
+      "mean_price": 0.0536178670195742,
+      "rel_tick": 1.8650499461959783e-05
+    },
+    {
+      "symbol": "KEYUSDT",
+      "n_events": 2889130,
+      "p_flip": 0.45785875258598696,
+      "tick_size": 1e-07,
+      "mean_price": 0.007558211913102902,
+      "rel_tick": 1.3230642531554347e-05
+    },
+    {
+      "symbol": "ADAUSDT",
+      "n_events": 4406216,
+      "p_flip": 0.6029106614180197,
+      "tick_size": 0.0001,
+      "mean_price": 0.2942286842894564,
+      "rel_tick": 0.00033987168940205015
+    },
+    {
+      "symbol": "DOGEUSDT",
+      "n_events": 3605236,
+      "p_flip": 0.5569603645809497,
+      "tick_size": 1e-05,
+      "mean_price": 0.06528635283307259,
+      "rel_tick": 0.0001531713683802877
+    },
+    {
+      "symbol": "APTUSDT",
+      "n_events": 3361904,
+      "p_flip": 0.45602475740674253,
+      "tick_size": 0.0001,
+      "mean_price": 7.261978509303126,
+      "rel_tick": 1.3770351960129417e-05
+    },
+    {
+      "symbol": "COMPUSDT",
+      "n_events": 3070323,
+      "p_flip": 0.55121808070945,
+      "tick_size": 0.01,
+      "mean_price": 43.23301506953999,
+      "rel_tick": 0.00023130470969732445
+    },
+    {
+      "symbol": "EDUUSDT",
+      "n_events": 2940081,
+      "p_flip": 0.42310209246006913,
+      "tick_size": 0.0001,
+      "mean_price": 0.8507971700953538,
+      "rel_tick": 0.00011753682724261109
+    },
+    {
+      "symbol": "1000SHIBUSDT",
+      "n_events": 3031796,
+      "p_flip": 0.47316556693312045,
+      "tick_size": 1e-06,
+      "mean_price": 0.007398525870376192,
+      "rel_tick": 0.00013516206032393764
+    },
+    {
+      "symbol": "CFXUSDT",
+      "n_events": 3540863,
+      "p_flip": 0.519123591938912,
+      "tick_size": 1e-05,
+      "mean_price": 0.22448944622781936,
+      "rel_tick": 4.4545523934571375e-05
+    },
+    {
+      "symbol": "APEUSDT",
+      "n_events": 3687286,
+      "p_flip": 0.5453974943623832,
+      "tick_size": 0.0001,
+      "mean_price": 2.5170037011277913,
+      "rel_tick": 3.972977868693364e-05
+    },
+    {
+      "symbol": "WOOUSDT",
+      "n_events": 2182934,
+      "p_flip": 0.3884599298283548,
+      "tick_size": 1e-05,
+      "mean_price": 0.20396511949595947,
+      "rel_tick": 4.902799078936681e-05
+    },
+    {
+      "symbol": "RENUSDT",
+      "n_events": 2313468,
+      "p_flip": 0.42126254664535956,
+      "tick_size": 1e-05,
+      "mean_price": 0.07044905383340107,
+      "rel_tick": 0.00014194654797846035
+    },
+    {
+      "symbol": "GRTUSDT",
+      "n_events": 2257050,
+      "p_flip": 0.4014972647913271,
+      "tick_size": 1e-05,
+      "mean_price": 0.11141201335973878,
+      "rel_tick": 8.975692744830805e-05
+    },
+    {
+      "symbol": "NKNUSDT",
+      "n_events": 2132019,
+      "p_flip": 0.4044159101846232,
+      "tick_size": 1e-05,
+      "mean_price": 0.10762624372345497,
+      "rel_tick": 9.291414114288839e-05
+    },
+    {
+      "symbol": "SANDUSDT",
+      "n_events": 2732112,
+      "p_flip": 0.48144969219771816,
+      "tick_size": 1e-05,
+      "mean_price": 0.4692576397664836,
+      "rel_tick": 2.1310255076457136e-05
+    },
+    {
+      "symbol": "LINKUSDT",
+      "n_events": 2627039,
+      "p_flip": 0.4736570236136668,
+      "tick_size": 0.001,
+      "mean_price": 5.750323141485951,
+      "rel_tick": 0.00017390327037196526
+    },
+    {
+      "symbol": "MAGICUSDT",
+      "n_events": 2203613,
+      "p_flip": 0.39922908388591094,
+      "tick_size": 0.0001,
+      "mean_price": 0.8336554645740025,
+      "rel_tick": 0.00011995363102561794
+    },
+    {
+      "symbol": "ATOMUSDT",
+      "n_events": 2456324,
+      "p_flip": 0.43913239423316885,
+      "tick_size": 0.001,
+      "mean_price": 9.135675714769567,
+      "rel_tick": 0.00010946097817190564
+    },
+    {
+      "symbol": "AVAXUSDT",
+      "n_events": 2458978,
+      "p_flip": 0.4138623500748482,
+      "tick_size": 0.001,
+      "mean_price": 12.74728337504728,
+      "rel_tick": 7.844808737503186e-05
+    },
+    {
+      "symbol": "OMGUSDT",
+      "n_events": 2169007,
+      "p_flip": 0.46241688589150975,
+      "tick_size": 0.0001,
+      "mean_price": 0.6543425925592308,
+      "rel_tick": 0.00015282514257383917
+    },
+    {
+      "symbol": "COMBOUSDT",
+      "n_events": 1495384,
+      "p_flip": 0.4216050336268367,
+      "tick_size": 0.0001,
+      "mean_price": 1.2879937817420302,
+      "rel_tick": 7.764012638690582e-05
+    },
+    {
+      "symbol": "BLURUSDT",
+      "n_events": 2244288,
+      "p_flip": 0.4738413580794257,
+      "tick_size": 1e-05,
+      "mean_price": 0.3750730755477203,
+      "rel_tick": 2.6661471195704922e-05
+    },
+    {
+      "symbol": "CHZUSDT",
+      "n_events": 2224240,
+      "p_flip": 0.4066982010476392,
+      "tick_size": 1e-05,
+      "mean_price": 0.07849946257437071,
+      "rel_tick": 0.00012738940716346893
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "n_events": 2282773,
+      "p_flip": 0.471489049278684,
+      "tick_size": 0.01,
+      "mean_price": 62.49408436800596,
+      "rel_tick": 0.00016001514545142343
+    },
+    {
+      "symbol": "TRUUSDT",
+      "n_events": 2059642,
+      "p_flip": 0.4405860050368001,
+      "tick_size": 1e-05,
+      "mean_price": 0.04183724911087242,
+      "rel_tick": 0.0002390214512789575
+    },
+    {
+      "symbol": "TRXUSDT",
+      "n_events": 2313889,
+      "p_flip": 0.48907725870915103,
+      "tick_size": 1e-05,
+      "mean_price": 0.07469025708067184,
+      "rel_tick": 0.00013388627099246891
+    },
+    {
+      "symbol": "BANDUSDT",
+      "n_events": 1886161,
+      "p_flip": 0.387756606014336,
+      "tick_size": 0.0001,
+      "mean_price": 1.1747491789512163,
+      "rel_tick": 8.512455406802434e-05
+    },
+    {
+      "symbol": "SFPUSDT",
+      "n_events": 2154544,
+      "p_flip": 0.4971954609399766,
+      "tick_size": 0.0001,
+      "mean_price": 0.4364464703611766,
+      "rel_tick": 0.00022912317269342577
+    },
+    {
+      "symbol": "AMBUSDT",
+      "n_events": 2302744,
+      "p_flip": 0.582793216611667,
+      "tick_size": 1e-06,
+      "mean_price": 0.01090440992310358,
+      "rel_tick": 9.170601683647848e-05
+    },
+    {
+      "symbol": "OCEANUSDT",
+      "n_events": 2221038,
+      "p_flip": 0.48744437845925126,
+      "tick_size": 0.0001,
+      "mean_price": 0.3465981274408064,
+      "rel_tick": 0.0002885185812698265
+    },
+    {
+      "symbol": "IDUSDT",
+      "n_events": 2144610,
+      "p_flip": 0.48992660200530724,
+      "tick_size": 1e-05,
+      "mean_price": 0.3240771701778287,
+      "rel_tick": 3.0856848060333185e-05
+    },
+    {
+      "symbol": "XLMUSDT",
+      "n_events": 1906268,
+      "p_flip": 0.43896474103575206,
+      "tick_size": 1e-05,
+      "mean_price": 0.09354435130382054,
+      "rel_tick": 0.00010690116357235973
+    },
+    {
+      "symbol": "MASKUSDT",
+      "n_events": 2250524,
+      "p_flip": 0.4764568058180254,
+      "tick_size": 0.0001,
+      "mean_price": 3.7882940932394558,
+      "rel_tick": 2.63971058050796e-05
+    },
+    {
+      "symbol": "SXPUSDT",
+      "n_events": 2001787,
+      "p_flip": 0.47808606914025775,
+      "tick_size": 0.0001,
+      "mean_price": 0.377894397236974,
+      "rel_tick": 0.00026462419324330697
+    },
+    {
+      "symbol": "XMRUSDT",
+      "n_events": 1838222,
+      "p_flip": 0.4008805252469643,
+      "tick_size": 0.01,
+      "mean_price": 149.33971607033615,
+      "rel_tick": 6.696142367975436e-05
+    },
+    {
+      "symbol": "FILUSDT",
+      "n_events": 2075828,
+      "p_flip": 0.479385324499585,
+      "tick_size": 0.0001,
+      "mean_price": 3.927722152352045,
+      "rel_tick": 2.5460049392780197e-05
+    },
+    {
+      "symbol": "DOTUSDT",
+      "n_events": 2209346,
+      "p_flip": 0.4874191219569601,
+      "tick_size": 0.0001,
+      "mean_price": 4.857107360787126,
+      "rel_tick": 2.058838575554862e-05
+    },
+    {
+      "symbol": "LUNA2USDT",
+      "n_events": 1780217,
+      "p_flip": 0.40972162928543504,
+      "tick_size": 1e-05,
+      "mean_price": 0.7005074381068248,
+      "rel_tick": 1.427536590764228e-05
+    },
+    {
+      "symbol": "GALAUSDT",
+      "n_events": 2017116,
+      "p_flip": 0.5012877302483993,
+      "tick_size": 1e-06,
+      "mean_price": 0.024781441656974178,
+      "rel_tick": 4.035277744701235e-05
+    },
+    {
+      "symbol": "FTMUSDT",
+      "n_events": 2063610,
+      "p_flip": 0.5048422448244798,
+      "tick_size": 0.0001,
+      "mean_price": 0.28710200656800067,
+      "rel_tick": 0.00034830825878019354
+    },
+    {
+      "symbol": "AXSUSDT",
+      "n_events": 1996023,
+      "p_flip": 0.45801599381169145,
+      "tick_size": 0.001,
+      "mean_price": 5.743001643407618,
+      "rel_tick": 0.00017412497193830656
+    },
+    {
+      "symbol": "STORJUSDT",
+      "n_events": 1952059,
+      "p_flip": 0.5109868661689355,
+      "tick_size": 1e-05,
+      "mean_price": 0.28006177664281223,
+      "rel_tick": 3.5706407778573413e-05
+    },
+    {
+      "symbol": "NEOUSDT",
+      "n_events": 1675306,
+      "p_flip": 0.40082014916686814,
+      "tick_size": 0.001,
+      "mean_price": 8.831621154794497,
+      "rel_tick": 0.00011322949461629947
+    },
+    {
+      "symbol": "IMXUSDT",
+      "n_events": 1782554,
+      "p_flip": 0.39458406005319335,
+      "tick_size": 0.0001,
+      "mean_price": 0.7006382464733087,
+      "rel_tick": 0.00014272700713007617
+    },
+    {
+      "symbol": "DUSKUSDT",
+      "n_events": 1454794,
+      "p_flip": 0.39836251617927776,
+      "tick_size": 1e-05,
+      "mean_price": 0.1213344136954622,
+      "rel_tick": 8.241684857108261e-05
+    },
+    {
+      "symbol": "MKRUSDT",
+      "n_events": 1730991,
+      "p_flip": 0.42668184102738893,
+      "tick_size": 0.1,
+      "mean_price": 687.7961695766345,
+      "rel_tick": 0.00014539191176588543
+    },
+    {
+      "symbol": "BELUSDT",
+      "n_events": 1615858,
+      "p_flip": 0.4205495907125445,
+      "tick_size": 0.0001,
+      "mean_price": 0.6626133031698369,
+      "rel_tick": 0.00015091758574966102
+    },
+    {
+      "symbol": "RLCUSDT",
+      "n_events": 1398766,
+      "p_flip": 0.3986688257141121,
+      "tick_size": 0.0001,
+      "mean_price": 1.3471101851842355,
+      "rel_tick": 7.423297745041075e-05
+    },
+    {
+      "symbol": "DYDXUSDT",
+      "n_events": 1808950,
+      "p_flip": 0.4943577734916794,
+      "tick_size": 0.001,
+      "mean_price": 1.8837299883871375,
+      "rel_tick": 0.0005308616448030361
+    },
+    {
+      "symbol": "ANTUSDT",
+      "n_events": 1698405,
+      "p_flip": 0.46240941495662985,
+      "tick_size": 0.001,
+      "mean_price": 3.8167887948387023,
+      "rel_tick": 0.0002620003499675596
+    },
+    {
+      "symbol": "LQTYUSDT",
+      "n_events": 1366845,
+      "p_flip": 0.3792620079540899,
+      "tick_size": 0.0001,
+      "mean_price": 0.9475174909087756,
+      "rel_tick": 0.00010553894884208288
+    },
+    {
+      "symbol": "FLMUSDT",
+      "n_events": 1792306,
+      "p_flip": 0.5769961027838454,
+      "tick_size": 0.0001,
+      "mean_price": 0.09019277234403655,
+      "rel_tick": 0.0011087362922890783
+    },
+    {
+      "symbol": "JOEUSDT",
+      "n_events": 1637416,
+      "p_flip": 0.43011270814057523,
+      "tick_size": 1e-05,
+      "mean_price": 0.3977351740221568,
+      "rel_tick": 2.5142357661942483e-05
+    },
+    {
+      "symbol": "NEARUSDT",
+      "n_events": 1947040,
+      "p_flip": 0.4974620436467888,
+      "tick_size": 0.001,
+      "mean_price": 1.4028150387928127,
+      "rel_tick": 0.0007128523521251571
+    },
+    {
+      "symbol": "UNIUSDT",
+      "n_events": 1765940,
+      "p_flip": 0.4529539242295459,
+      "tick_size": 0.001,
+      "mean_price": 4.746750403497387,
+      "rel_tick": 0.00021067044082688738
+    },
+    {
+      "symbol": "JASMYUSDT",
+      "n_events": 1510318,
+      "p_flip": 0.4367526817217842,
+      "tick_size": 1e-06,
+      "mean_price": 0.004088583726518753,
+      "rel_tick": 0.00024458347116972345
+    },
+    {
+      "symbol": "MANAUSDT",
+      "n_events": 1661320,
+      "p_flip": 0.47881833651454053,
+      "tick_size": 1e-05,
+      "mean_price": 0.3996591055090897,
+      "rel_tick": 2.5021324078834393e-05
+    },
+    {
+      "symbol": "SUSHIUSDT",
+      "n_events": 1625378,
+      "p_flip": 0.4433494506197639,
+      "tick_size": 0.0001,
+      "mean_price": 0.6778854663944265,
+      "rel_tick": 0.00014751754530434967
+    },
+    {
+      "symbol": "PHBUSDT",
+      "n_events": 1414233,
+      "p_flip": 0.3892946843233642,
+      "tick_size": 0.0001,
+      "mean_price": 0.7046121292235574,
+      "rel_tick": 0.0001419220530736454
+    },
+    {
+      "symbol": "EOSUSDT",
+      "n_events": 1740775,
+      "p_flip": 0.5038172674913572,
+      "tick_size": 0.001,
+      "mean_price": 0.7369633977793839,
+      "rel_tick": 0.001356919492899101
+    },
+    {
+      "symbol": "AGIXUSDT",
+      "n_events": 1526175,
+      "p_flip": 0.449648598390485,
+      "tick_size": 0.0001,
+      "mean_price": 0.2352136471635831,
+      "rel_tick": 0.0004251453995373551
+    },
+    {
+      "symbol": "1000XECUSDT",
+      "n_events": 1358479,
+      "p_flip": 0.5118456095718885,
+      "tick_size": 1e-06,
+      "mean_price": 0.030152889225534555,
+      "rel_tick": 3.316431777135187e-05
+    },
+    {
+      "symbol": "RDNTUSDT",
+      "n_events": 1436761,
+      "p_flip": 0.4603601158161419,
+      "tick_size": 1e-05,
+      "mean_price": 0.28561323074437134,
+      "rel_tick": 3.5012383613804537e-05
+    },
+    {
+      "symbol": "HIGHUSDT",
+      "n_events": 1511544,
+      "p_flip": 0.4690491769006902,
+      "tick_size": 0.0001,
+      "mean_price": 1.5525949364563922,
+      "rel_tick": 6.440829971289083e-05
+    },
+    {
+      "symbol": "FETUSDT",
+      "n_events": 1480413,
+      "p_flip": 0.4491317281945837,
+      "tick_size": 0.0001,
+      "mean_price": 0.2199211527447685,
+      "rel_tick": 0.0004547084205040336
+    },
+    {
+      "symbol": "QNTUSDT",
+      "n_events": 1311302,
+      "p_flip": 0.39979913078690554,
+      "tick_size": 0.01,
+      "mean_price": 107.25184341140876,
+      "rel_tick": 9.323849065829916e-05
+    },
+    {
+      "symbol": "THETAUSDT",
+      "n_events": 1287639,
+      "p_flip": 0.4060279364231251,
+      "tick_size": 0.0001,
+      "mean_price": 0.7201231253135632,
+      "rel_tick": 0.0001388651419248021
+    },
+    {
+      "symbol": "CRVUSDT",
+      "n_events": 1471623,
+      "p_flip": 0.44652770888176446,
+      "tick_size": 0.0001,
+      "mean_price": 0.7045967243336666,
+      "rel_tick": 0.00014192515597424821
+    },
+    {
+      "symbol": "ZENUSDT",
+      "n_events": 1107250,
+      "p_flip": 0.40613087029204814,
+      "tick_size": 0.001,
+      "mean_price": 7.501831540881082,
+      "rel_tick": 0.00013330078055612417
+    },
+    {
+      "symbol": "ROSEUSDT",
+      "n_events": 1165063,
+      "p_flip": 0.4063165737102403,
+      "tick_size": 1e-06,
+      "mean_price": 0.048760966574626634,
+      "rel_tick": 2.050820708136582e-05
+    },
+    {
+      "symbol": "FXSUSDT",
+      "n_events": 1163246,
+      "p_flip": 0.4142876178277147,
+      "tick_size": 0.0001,
+      "mean_price": 5.626519827263307,
+      "rel_tick": 1.777297567058236e-05
+    },
+    {
+      "symbol": "KNCUSDT",
+      "n_events": 1122255,
+      "p_flip": 0.40912395946015784,
+      "tick_size": 0.0001,
+      "mean_price": 0.5654955677746764,
+      "rel_tick": 0.00017683604558302275
+    },
+    {
+      "symbol": "TUSDT",
+      "n_events": 1188607,
+      "p_flip": 0.473838260954429,
+      "tick_size": 1e-05,
+      "mean_price": 0.02375386684775902,
+      "rel_tick": 0.0004209840892049716
+    },
+    {
+      "symbol": "ACHUSDT",
+      "n_events": 1205804,
+      "p_flip": 0.43606376829382576,
+      "tick_size": 1e-06,
+      "mean_price": 0.02281636563048287,
+      "rel_tick": 4.382818965102799e-05
+    },
+    {
+      "symbol": "MINAUSDT",
+      "n_events": 1145911,
+      "p_flip": 0.4033772285781606,
+      "tick_size": 0.0001,
+      "mean_price": 0.4634707452587531,
+      "rel_tick": 0.00021576334865358238
+    },
+    {
+      "symbol": "GMTUSDT",
+      "n_events": 1268002,
+      "p_flip": 0.4959207445419996,
+      "tick_size": 1e-06,
+      "mean_price": 0.2191137532483528,
+      "rel_tick": 4.563839490561588e-06
+    },
+    {
+      "symbol": "BNXUSDT",
+      "n_events": 1156585,
+      "p_flip": 0.36585237215801014,
+      "tick_size": 0.0001,
+      "mean_price": 0.3367624337623586,
+      "rel_tick": 0.00029694523490279346
+    },
+    {
+      "symbol": "HBARUSDT",
+      "n_events": 1120699,
+      "p_flip": 0.40274097035954376,
+      "tick_size": 1e-05,
+      "mean_price": 0.04803369113436509,
+      "rel_tick": 0.00020818720701740176
+    },
+    {
+      "symbol": "1000FLOKIUSDT",
+      "n_events": 1071346,
+      "p_flip": 0.443234438952905,
+      "tick_size": 1e-05,
+      "mean_price": 0.026148845684441084,
+      "rel_tick": 0.000382426058904395
+    },
+    {
+      "symbol": "SNXUSDT",
+      "n_events": 1204975,
+      "p_flip": 0.4612680439577949,
+      "tick_size": 0.0001,
+      "mean_price": 2.083821973438355,
+      "rel_tick": 4.798874437195691e-05
+    },
+    {
+      "symbol": "STGUSDT",
+      "n_events": 1024583,
+      "p_flip": 0.40172382493543707,
+      "tick_size": 0.0001,
+      "mean_price": 0.5858500947041261,
+      "rel_tick": 0.00017069212910258784
+    },
+    {
+      "symbol": "COTIUSDT",
+      "n_events": 1033785,
+      "p_flip": 0.3851558933007282,
+      "tick_size": 1e-06,
+      "mean_price": 0.051817854759349566,
+      "rel_tick": 1.9298367418801114e-05
+    },
+    {
+      "symbol": "ANKRUSDT",
+      "n_events": 1076265,
+      "p_flip": 0.46399675172634225,
+      "tick_size": 1e-05,
+      "mean_price": 0.023256815160826214,
+      "rel_tick": 0.00042998148847328
+    },
+    {
+      "symbol": "VETUSDT",
+      "n_events": 1133146,
+      "p_flip": 0.4578054882649617,
+      "tick_size": 1e-06,
+      "mean_price": 0.017585905562786934,
+      "rel_tick": 5.6863719438825674e-05
+    },
+    {
+      "symbol": "RADUSDT",
+      "n_events": 1177447,
+      "p_flip": 0.46350915455995434,
+      "tick_size": 0.0001,
+      "mean_price": 1.7725410477014238,
+      "rel_tick": 5.6416182931095954e-05
+    },
+    {
+      "symbol": "DASHUSDT",
+      "n_events": 1046537,
+      "p_flip": 0.42960681715679155,
+      "tick_size": 0.01,
+      "mean_price": 34.341168289023464,
+      "rel_tick": 0.000291195684312124
+    },
+    {
+      "symbol": "LPTUSDT",
+      "n_events": 1009205,
+      "p_flip": 0.3983664353292298,
+      "tick_size": 0.001,
+      "mean_price": 4.536919072132771,
+      "rel_tick": 0.00022041389412086375
+    },
+    {
+      "symbol": "YFIUSDT",
+      "n_events": 1071320,
+      "p_flip": 0.3912606795921663,
+      "tick_size": 1.0,
+      "mean_price": 6008.17161817985,
+      "rel_tick": 0.00016643998599742823
+    },
+    {
+      "symbol": "CTSIUSDT",
+      "n_events": 1022623,
+      "p_flip": 0.4436155294918357,
+      "tick_size": 1e-05,
+      "mean_price": 0.14389084217998804,
+      "rel_tick": 6.949712607485714e-05
+    }
+  ],
+  "skipped": [
+    {
+      "symbol": "RNDRUSDT",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    },
+    {
+      "symbol": "MATICUSDT",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    },
+    {
+      "symbol": "BTCBUSD",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    },
+    {
+      "symbol": "ETHBUSD",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    },
+    {
+      "symbol": "GALUSDT",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    },
+    {
+      "symbol": "SOLBUSD",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    },
+    {
+      "symbol": "LDOBUSD",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    },
+    {
+      "symbol": "GALABUSD",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    },
+    {
+      "symbol": "ICPUSDT",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    },
+    {
+      "symbol": "XRPBUSD",
+      "reason": "no tickSize in exchangeInfo snapshot"
+    }
+  ],
+  "exchange_info_url": "https://testnet.binancefuture.com/fapi/v1/exchangeInfo",
+  "exchange_info_source_note": "The specified mainnet endpoint (fapi.binance.com/fapi/v1/exchangeInfo) returned HTTP 451 (geo-restricted) from this execution environment, as did every other fapi.binance.com/api.binance.com/dapi.binance.com path tried. The futures TESTNET exchangeInfo endpoint (testnet.binancefuture.com) was reachable and returns the same PRICE_FILTER schema; its BTCUSDT tickSize (0.10) matches the known mainnet value, but testnet contract specs are not guaranteed identical to mainnet for every symbol and this snapshot is missing 10 of Q4's 121 symbols (all delisted/renamed BUSD or discontinued pairs) that mainnet's live exchangeInfo would likely still list historically. Treat tick sizes in this run as a best-effort proxy for mainnet, not a verified mainnet snapshot.",
+  "regressions": {
+    "note": null,
+    "reg_activity": {
+      "coefficients": {
+        "intercept": {
+          "value": -0.21395268801062753,
+          "stderr": 0.09999013364809461,
+          "t_ratio": -2.139737994186635
+        },
+        "log10_n_events": {
+          "value": 0.10595846386909454,
+          "stderr": 0.015708548396986703,
+          "t_ratio": 6.745274050237516
+        }
+      },
+      "r2": 0.29449254608748043,
+      "n": 111
+    },
+    "reg_tick": {
+      "coefficients": {
+        "intercept": {
+          "value": 0.4814216054418696,
+          "stderr": 0.04386832023391485,
+          "t_ratio": 10.974242981605661
+        },
+        "log10_rel_tick": {
+          "value": 0.005348841248795103,
+          "stderr": 0.010802265480517097,
+          "t_ratio": 0.4951592106713394
+        }
+      },
+      "r2": 0.0022443336903181788,
+      "n": 111
+    },
+    "reg_joint": {
+      "coefficients": {
+        "intercept": {
+          "value": -0.181241206331044,
+          "stderr": 0.09970822086911205,
+          "t_ratio": -1.8177157786112854
+        },
+        "log10_n_events": {
+          "value": 0.11295871110608711,
+          "stderr": 0.01582808833779995,
+          "t_ratio": 7.136598475782073
+        },
+        "log10_rel_tick": {
+          "value": 0.019153394218057968,
+          "stderr": 0.00915263112171227,
+          "t_ratio": 2.092665372760566
+        }
+      },
+      "r2": 0.3219850983797944,
+      "n": 111
+    },
+    "corr_log_n_log_rel_tick": -0.21134166534625778
+  }
+}

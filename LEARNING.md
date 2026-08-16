@@ -1,9 +1,10 @@
 # LEARNING.md
 
 This document explains every concept, every estimator, and every judgment call behind the
-Phase-1 results in `results/`. It is written to be defended out loud. Every number here comes
+results in `results/`. It is written to be defended out loud. Every number here comes
 from this repository's actual output — `results/q1_results.json`, `q2_results.json`,
-`q3_results.json` — not from the literature and not from memory. Where a result is uncertain or
+`q3_results.json` for Phase 1, and `q4_cross_section.json`, `q5_kernel_panel.json` for Phase 2 —
+not from the literature and not from memory. Where a result is uncertain or
 sample-limited, the sentence containing it says so.
 
 Read it alongside the code it describes. Each section names the file it explains.
@@ -15,7 +16,8 @@ Read it alongside the code it describes. Each section names the file it explains
 3. [Price impact and the response function](#3-price-impact-and-the-response-function)
 4. [OFI and linear impact](#4-ofi-and-linear-impact)
 5. [Statistics used honestly](#5-statistics-used-honestly)
-6. [Interview drill](#6-interview-drill)
+6. [Phase 2: the cross-section and the kernel](#6-phase-2-the-cross-section-and-the-kernel)
+7. [Interview drill](#7-interview-drill)
 
 ---
 
@@ -795,9 +797,262 @@ the proof.
 
 ---
 
-## 6. Interview drill
+## 6. Phase 2: the cross-section and the kernel
 
-Ten questions with answers grounded in this project's actual numbers.
+*Code: `src/microstructure/estimators/propagator.py`,
+`src/microstructure/analyses/q4_cross_section.py`,
+`src/microstructure/analyses/q5_kernel_panel.py`.
+Results: `results/q4_cross_section.md`, `results/q5_kernel_panel.md`.*
+
+Phase 1 measured two symbols. Phase 2 does two things Phase 1 explicitly could not: it runs the
+order-flow-memory statistics across **121 symbols**, and it separates the impact kernel from flow
+memory using a **deconvolution estimator** — closing the "R, not G" gap that §3 and the Phase-1
+limitations list both flagged.
+
+### 6.1 The propagator model, and why deconvolution is necessary
+
+§3 established the mixing identity: what we measure, `R(ℓ)`, is not the thing we want, `G(ℓ)`.
+The propagator model states the mixing precisely, as a moving average on mid-price increments:
+
+```
+dm[t] = m[t+1] − m[t] = Σ_n κ[n] · signs[t−n] + noise[t]
+```
+
+Each signed event contributes `κ[n]` to the price change `n` steps later, and contributions from
+all past events **superpose linearly**. Cross-correlate both sides with `signs[t−j]`:
+
+```
+b[j] = E[dm[t] · signs[t−j]] = Σ_n κ[n] · C[|j−n|]
+```
+
+where `C` is the sign ACF from Q1. That is a **Toeplitz linear system**: `b` and `C` are both
+measurable, `κ` is the unknown, and recovering `κ` is a linear solve. This is the whole idea.
+Reading the kernel off `b` directly — or off `R(ℓ)`, which is a partial sum of `b` — implicitly
+assumes `C = δ`, i.e. i.i.d. signs. Q1 measured that assumption to be badly false. Deconvolution
+is the correction.
+
+**The plain-language version:** the response function is the kernel convolved with the crowd's
+reaction to itself. One trade moves the price a little, but that trade also predicts the *next*
+several trades, which move the price too, and the response function adds up all of it. Solving
+the linear system un-mixes the two — it asks "what per-event impact, run through this particular
+flow-memory structure, would produce the response I actually see?"
+
+**Why the naive read is not a rough approximation but a wrong answer.** On synthetic data with a
+*planted* kernel exponent of 0.35 (fractional signs at d = 0.35, mids built by convolving with
+`G0(ℓ) = ℓ^(−0.35)`), the two methods on the same dataset, across the three seeds
+`tests/estimators/test_propagator.py` runs:
+
+| Method | recovered exponent (range across seeds 20-22) | error (range) |
+|---|---|---|
+| Deconvolved β̂ | **0.377–0.397** | 0.027–0.047 |
+| Naive fit on the response function | **0.063–0.125** | 0.225–0.287 |
+
+(Seed 20 alone: deconvolved 0.3766, error 0.0266; naive 0.0633, error 0.2867.)
+
+The naive read is off by an order of magnitude in error — it returns something nearly flat,
+because long-memory flow makes the raw response *rise* rather than track the decaying bare
+kernel. That is the same phenomenon as Q2's rising R, seen from the estimator's side. This
+contrast is a passing test in `tests/estimators/test_propagator.py`, not a claim.
+
+**The honesty constraints built into the estimator.** Three, each earned:
+
+1. **A samples-per-lag floor.** `deconvolve_kernel` requires `n_samples / L ≥ 100`. The reason is
+   subtle and worth stating: the rank and condition number of the Toeplitz matrix are properties
+   of the ACF *values*, not of how well those values were estimated. At n = 1,000 and L = 300,
+   condition numbers of ~40–500 were observed — entirely normal-looking — while the recovered
+   exponent ranged **0.15 to 0.65** against a planted 0.35 across 20 seeds. Pure estimation
+   noise, invisible to every diagnostic the matrix itself offers.
+2. **Block-bootstrap uncertainty, not OLS stderr.** On the same synthetic setup, OLS stderr was
+   ≈ 0.00136 while the actual Monte-Carlo sd of β̂ across seeds was ≈ 0.0092 — **6.8× larger**.
+   This is §5's autocorrelation problem again, and this time the fix shipped:
+   `kernel_exponent_blocked` reports the sd across 5 contiguous blocks.
+3. **A measured finite-L bias.** The mean recovered β̂ was ≈ 0.386 against a planted 0.35 — a
+   systematic **+0.03 to +0.04** bias at L = 300. This one matters enormously downstream, and
+   §6.3 is where it earns its keep.
+
+### 6.2 Two cross-sectional laws
+
+Q4 runs Q1's statistics on every symbol in a 207-symbol universe with ≥ 1M aggressor events in
+2023-06. **121 symbols cleared the bar; 86 were skipped below it, 0 failed.** The retained set
+spans **1.33 decades** of activity (1,009,205 to 21,816,890 events). Two results, pulling in
+opposite directions.
+
+**Law 1 — γ is liquidity-invariant.** Regressing γ̂ on log₁₀(activity): slope **−0.0112**
+(stderr 0.0547), **R² = 0.0003**. That is not a weak relationship; it is the absence of one.
+Across the full observed activity range the fitted line moves γ̂ by **−0.0149**, against a
+cross-sectional standard deviation of **0.1674** — the fitted line's movement is about a ninth
+of one standard deviation (R² says the trend explains about 0.03% of the variance). Meanwhile
+γ̂ itself varies enormously: median **0.327**, range **0.065**
+(BNXUSDT) to **1.429** (GALABUSD), IQR 0.278–0.376, with **79 of 121** landing inside the
+0.3–0.7 equities range. So symbols differ a lot in long memory, and how much they trade predicts
+essentially none of it.
+
+**Law 2 — p_flip rises with activity.** `p_flip = P(sign_{t+1} ≠ sign_t)`, where 0.5 is the
+coin-flip benchmark. Regressing on log₁₀(activity): slope **+0.1114** (stderr 0.0171),
+**R² = 0.2632**. Over the observed range the fitted p_flip climbs from **0.414 to 0.563** —
+crossing 0.5. It is not a subtle tilt. The cleanest way to see it: of the 20 most active symbols,
+**8 are anti-persistent** (p_flip > 0.5, equivalently lag-1 ACF < 0 — the two sets are
+identical); of the 20 least active, **zero** are. Across the whole cross-section **20 of 121**
+symbols are anti-persistent at lag 1, and they are concentrated at the top of the activity
+distribution.
+
+**The interpretation — offered as hypothesis, not result.** The two laws split a statistic that
+Phase 1 treated as one thing. Long-memory decay at lags 10–500 may reflect **order splitting**: a
+large trader working a metaorder over hours leaves a persistent trail regardless of how liquid
+the venue is, so γ is a property of *how institutions execute*, roughly universal. Lag-1
+structure may instead be **mechanical and competitive**: in a busy book, one aggressive order
+provokes an immediate opposite-side response — market makers refilling, arbitrageurs leaning
+against — producing alternation, and this pressure scales with how contested the book is. Long
+memory would then be a trader-behavior property and short-lag structure a market-structure
+property, which is why one tracks liquidity and the other does not.
+
+**What would falsify it — tested in Q4b.** The alternative was a **tick-size confound**: relative
+tick size (tick divided by price) is a mechanical driver of bid-ask bounce and lag-1 alternation,
+and it correlates with activity — high-activity Binance perps tend to be the ones where the tick
+is small relative to price. If p_flip is really tracking relative tick size, "activity" is a
+proxy and the competitive-response story is decoration on a bid-ask-bounce artifact. Q4b
+(`results/q4b_tick_confound.md`) ran the discriminating regression on 111 of Q4's 121 symbols
+(10 dropped for missing current tick-size data — mostly delisted BUSD pairs): `p_flip ~
+log10(n_events) + log10(rel_tick)` jointly. **Both coefficients survive.** Activity: coefficient
+**+0.1130** (t≈7.14); relative tick size: coefficient **+0.0192** (t≈2.09) — smaller and noisier,
+but not indistinguishable from zero by the rough t-ratio this project uses elsewhere. The
+collinearity motivating the test turned out weaker than assumed: corr(log-activity, log-rel-tick)
+= **−0.21**, not the strong entanglement the hypothesis implied. Joint R² (0.322) barely beats
+activity alone (0.294), while tick size alone explains almost nothing (R² = 0.002) — so the
+verdict is **activity is the dominant driver, tick size is a real but minor second contributor**,
+not the reverse. This does not fully clear the law: two caveats bite harder here than usual.
+First, tick size came from Binance's *current* exchangeInfo, not June 2023's — a small,
+uncorrected source of error if any symbol's tick changed since. Second, and larger: the mainnet
+`fapi.binance.com` endpoint this project meant to hit returned HTTP 451 (geo-blocked) from the
+execution environment; the numbers above come from the futures **testnet** exchangeInfo mirror
+instead (schema-identical, spot-checked against BTCUSDT's known mainnet tick, but not verified
+symbol-by-symbol against mainnet). Read this as a real result on a documented substitute data
+source, not a fully clean confirmation. Neither this nor Q4 has ruled out a survivor bias — the
+86 skipped symbols are all low-activity, so the low end of the regression is the most-active
+slice of an otherwise-excluded population.
+
+Also note that Q4's regression stderrs are worse than usually admitted: each symbol's γ̂ stderr
+already understates its own uncertainty (§5), and the understatement is **heteroskedastic** —
+it scales with each symbol's own n_events and ACF shape. The cross-sectional OLS therefore
+violates homoskedasticity on top of everything else. Read those R² and stderr figures as
+descriptive summaries, not confidence intervals. This is also why
+`q4_gamma_vs_activity.png` deliberately carries **no per-symbol error bars**: drawing them would
+imply a precision the estimates do not have.
+
+### 6.3 The critical-balance test
+
+**What the relation says.** Prices are approximately diffusive — variance grows roughly linearly
+in time, with no strong trend or mean reversion at the event scale. But order flow is strongly
+persistent (Q1). Persistent flow pushed through a non-decaying kernel would produce a trending,
+super-diffusive price. So for prices to stay diffusive, the kernel's decay must be **fine-tuned**
+against the flow's persistence. Bouchaud et al. (2004) make that precise:
+
+```
+β = (1 − γ) / 2
+```
+
+Faster-decaying memory (larger γ) permits a slower-decaying kernel, and vice versa. It is not a
+modelling convenience; it is a constraint that a diffusive market has to satisfy. Phase 1 could
+only check it indirectly — Q1's γ predicting Q2's 5.39× response ratio. Phase 2 measures β
+directly, so the relation becomes a real test.
+
+Q5 runs it on a **16-symbol panel** over one week (2023-06-01..07), computing `γ̂_week` and the
+deconvolved `β̂` from the same week's data, then `Δ = β̂ − (1−γ̂_week)/2`.
+
+**The verdict: 12 of 16 consistent, 4 violated** (1000PEPEUSDT, OPUSDT, SOLUSDT, ARBUSDT).
+Judgement rule: `|Δ| ≤ 2·max(block_sd, 0.04)`.
+
+**Why the bias floor makes this test conservative in exactly one direction.** The 0.04 floor is
+not a safety margin picked to be generous — it is §6.1's *measured* finite-L deconvolution bias.
+β̂ typically reads 0.03–0.04 **too high** purely from the method. Without the floor, a
+low-noise symbol with a genuinely zero Δ could be flagged "violated" by nothing but the
+estimator's own known bias — a false positive the code would have manufactured. (The floor binds
+for only **3 of the 16** symbols; the rest have block_sd above 0.04 and are judged on their own
+noise.)
+
+But the bias is **signed**, and that asymmetry is the most important sentence in this section.
+Since β̂ is biased *upward*, Δ = β̂ − (1−γ)/2 is biased upward too. So:
+
+- A **positive** Δ is suspect — some of it may be bias rather than signal.
+- A **negative** Δ is *understated* — the true departure is larger than measured.
+
+And **11 of 16 deltas are negative**, including **all 4 violations**, all of which are negative
+(−0.155 to −0.087). Correcting for the bias would push the deltas further negative and make more
+symbols violate, not fewer. The 12/16 "consistent" verdict is therefore the **most favourable**
+reading the data supports; a bias-corrected test would be harsher. Anyone quoting "75% consistent"
+without that sentence is quoting a number the method flatters.
+
+**What "kernels decay slower than critical" would mean if real.** β below `(1−γ)/2` means the
+kernel does not decay fast enough to offset the flow's persistence, so impact accumulates —
+mildly **super-diffusive**, trending prices at the event scale. Predictable directional drift
+after an event, which in principle is tradeable, which is why one should be suspicious of it
+surviving in a liquid market.
+
+**And here the two Phase-2 results are in tension, which is worth sitting with.** Q4's headline
+was that the most active symbols are the ones flipping *anti-persistently* — lag-1 ACF below zero
+— which is a **sub**-diffusive, mean-reverting pressure at short lags. Q5 says the kernels of
+high-activity symbols decay too slowly, a **super**-diffusive pressure. All four Q5 violations
+are mid-to-high activity symbols. Both cannot be the dominant effect at the same scale in the
+same book. Three ways to read it, and this data does not settle between them:
+
+1. **Different lags, both real.** Anti-persistence is a lag-1 phenomenon; the kernel exponent is
+   fit over lags 5–150. A book can bounce at one event and trend over a hundred. If so, the two
+   findings are describing different regions of the same curve and the tension is only apparent.
+2. **The linear model is wrong for exactly these symbols.** The deconvolution assumes impacts
+   superpose linearly. If real impact saturates or is state-dependent on spread and depth — most
+   plausibly in the busiest, most contested books — then β̂ for those symbols is a
+   linear-model artifact and the violation says the model failed, not that the market trends.
+3. **Both are estimator artifacts of the same underlying alternation.** Strong lag-1 alternation
+   distorts the ACF that feeds the Toeplitz system. The four violating symbols being high-activity
+   is exactly what you would see if short-lag zigzag were corrupting the deconvolution input.
+
+I lean toward (1) or (2), and I would not assert either. The honest statement is that Phase 2
+produced two results that do not sit comfortably together, and separating them needs the
+lag-resolved work Phase 3 would have to do.
+
+**A structural caveat, stated plainly:** a "violated" verdict is equally consistent with the true
+impact process being **nonlinear** and with the linear model holding but with a genuinely
+different β–γ relationship. The balance relation `β = (1−γ)/2` is *itself* a linear/diffusive
+propagator prediction. This analysis cannot distinguish "the market violates critical balance"
+from "the linear propagator is the wrong model here."
+
+### 6.4 What Phase 2 does not establish
+
+Every number in §6.2 and §6.3 is bounded by:
+
+- **One week, one month, one regime.** Q4 is a single month (2023-06); Q5 a single **7-day**
+  window. Phase 1.5 (§2) *measured* that these statistics are regime-dependent, so this is a
+  documented risk, not a hypothetical one. Nothing here shows the two cross-sectional laws
+  survive into another month.
+- **L1 mids only.** Every mid is a best-bid/best-ask midpoint. Impact through queue depletion or
+  hidden liquidity at depth is invisible to all of it — the same limitation that plausibly
+  explains Q3's low R².
+- **The linear-propagator assumption**, load-bearing for every β̂ in Q5, and untestable within
+  this analysis (see §6.3).
+- **Uncertainty is block_sd plus a bias floor, not a confidence interval.** `block_sd` comes from
+  only **5 contiguous blocks** per symbol — a noisy estimate of noise. The 0.04 floor is the
+  measured bias at L = 300, and the true bias at this panel's actual max_lag may differ from the
+  synthetic measurement it is based on. There is no formal CI anywhere in Phase 2.
+- **Survivorship.** The Q4 cross-section is the 121 symbols that cleared 1M events, not the
+  universe.
+
+### 6.5 On the novelty question
+
+`research/04-novelty-verification-verdicts.md` records three agents tasked with *refuting* this
+project's novelty claims. On the Phase-2 claim specifically ("the propagator program has never
+been applied across a crypto cross-section"), the verdict was that the strong form is **factually
+false** — a 2026 Hyperliquid study covers 201 perp markets and 641M fills with impact curves and
+decay trajectories, and cross-sectional propagator methodology already exists in FX. What survived
+was narrow: the **joint** package — R(ℓ) plus deconvolved G(ℓ) plus sign-ACF plus critical-balance
+verification, together, across many pairs on a centralized exchange — appears unexecuted, but as
+an incremental asset-class transfer, not an open problem. That is the claim this phase supports,
+with those caveats attached, and it is the only one worth making out loud.
+
+---
+
+## 7. Interview drill
+
+Fourteen questions with answers grounded in this project's actual numbers.
 
 ---
 
@@ -1022,21 +1277,143 @@ effects from regime effects. Sweep the Q3 bar length, and regress on signed trad
 alongside OFI to test Silantyev's crypto claim directly with data already on disk. None of that
 needs new data.
 
-**The measurement I stopped short of.** I measured R(ℓ) but never separated the kernel G from
-flow memory C. Propagator deconvolution would give me G directly, and then the critical-balance
-relation β = (1−γ)/2 becomes a real test rather than the consistency check I used — right now
-Q1's γ predicting Q2's 5.39× ratio is suggestive, not a measurement of β.
+**The measurement I stopped short of — since done.** Phase 1 measured R(ℓ) but never separated
+the kernel G from flow memory C. Phase 2 built the deconvolution estimator (§6.1) and ran the
+balance test on a 16-symbol panel (§6.3), so β = (1−γ)/2 is now a measurement rather than the
+consistency check Q2 used.
 
-**Phase 2, the cross-section.** Run Q1, Q2 and the balance check as one package across 50–100
-Binance perp pairs spanning at least three decades of daily volume, and ask whether γ, β and
-response amplitude vary systematically with liquidity. I checked the novelty question
-adversarially first — three agents tasked with refuting the gap claims, written up in
-`research/04-novelty-verification-verdicts.md`. The honest verdict is that everything in Phase 1
-is well-trodden, which is exactly what I wanted for a learning project, since published
-benchmarks exist at every step. For Phase 2, a Hyperliquid study has already done 201 perp
-markets and 641M fills, so the surviving gap is narrow: the joint R(ℓ) + G(ℓ) + sign-ACF +
-critical-balance package across a CEX cross-section, which is an incremental transfer rather
-than an open problem. I would rather state that accurately than oversell it.
+**Phase 2, the cross-section — done, with the results in §6.** 121 symbols on the trades side,
+16 on the kernel panel. I checked the novelty question adversarially first — three agents tasked
+with refuting the gap claims, written up in `research/04-novelty-verification-verdicts.md`. The
+honest verdict is that everything in Phase 1 is well-trodden, which is exactly what I wanted for
+a learning project, since published benchmarks exist at every step. For Phase 2, a Hyperliquid
+study has already done 201 perp markets and 641M fills, so the surviving gap is narrow: the joint
+R(ℓ) + G(ℓ) + sign-ACF + critical-balance package across a CEX cross-section, which is an
+incremental transfer rather than an open problem. I would rather state that accurately than
+oversell it.
+
+**Phase 3, what §6 leaves open.** Three things, in order of how much they would change the
+conclusions. Run the tick-size regression that would settle whether the p_flip law is real or a
+bid-ask-bounce proxy (§6.2). Resolve the sub-vs-super-diffusive tension between Q4's
+anti-persistence and Q5's slow kernels by fitting β over disjoint lag windows (§6.3). And repeat
+both on a second, disjoint week — because Phase 1.5 already measured that these statistics move
+with regime, and a single week cannot distinguish a law from a June.
+
+---
+
+**11. Walk me through how you separate the kernel from flow memory.**
+
+The problem is that the response function is not the kernel. `R(ℓ)` is what a signed trade is
+*followed* by, which mixes the trade's own impact with the impact of the correlated trades it
+predicts. With long-memory flow those correlated trades dominate, which is why Q2's response
+rises instead of decaying.
+
+The propagator model makes the mixing explicit: `dm[t] = Σ_n κ[n]·signs[t−n] + noise`, impacts
+superposing linearly. Cross-correlating with `signs[t−j]` gives `b[j] = Σ_n κ[n]·C[|j−n|]`, where
+C is the sign ACF I already measure in Q1. That is a Toeplitz system — b measurable, C
+measurable, κ unknown — so recovering the bare kernel is a linear solve. Reading κ straight off
+R implicitly sets C = δ, i.e. assumes i.i.d. signs, which Q1 measured to be badly false.
+
+I validated it before trusting it. On synthetic data with a planted exponent of 0.35, the
+deconvolution recovers 0.3767 while a naive power-law fit to the response function returns
+0.0633 — nearly flat, off by an order of magnitude in error. Same dataset, both methods; the
+gap is the flow memory.
+
+Three practical constraints in the implementation. I solve with least-squares rather than a
+direct inverse, because long-memory ACFs make the Toeplitz matrix near-singular. I enforce
+n_samples/L ≥ 100, because rank and condition number are properties of the ACF *values* and are
+blind to how noisily those values were estimated — at n = 1,000 and L = 300 I measured
+condition numbers of 40–500, which look completely fine, while the recovered exponent ranged
+0.15 to 0.65 across seeds. And I report uncertainty as a block-bootstrap sd, never the OLS
+stderr, which I measured to understate the true spread by 6.8×.
+
+---
+
+**12. Your balance test says consistent for 12 of 16. How much of that is your tolerance?**
+
+A fair amount, and the direction of the slack is the part that matters.
+
+The band is `|Δ| ≤ 2·max(block_sd, 0.04)`. The 0.04 is not a margin I chose for comfort — it is
+the measured finite-L bias of my own estimator: on synthetic data at L = 300, β̂ came back
++0.03 to +0.04 too high. Without the floor, a low-noise symbol with a genuinely zero Δ could be
+flagged "violated" by nothing but that bias, which would be a false positive my code manufactured.
+It binds for 3 of the 16 symbols; the other 13 are judged against their own block_sd.
+
+But here is the asymmetry I would want to volunteer rather than be asked. The bias is *signed* —
+upward — so Δ = β̂ − (1−γ)/2 is biased upward too. A positive Δ is therefore suspect, and a
+negative Δ is understated. Eleven of my sixteen deltas are negative, and all four violations are
+negative, from −0.087 to −0.155. Bias-correcting would push everything further negative and
+produce *more* violations, not fewer. So 12/16 is the most favourable reading the data supports,
+not a robust one — the tolerance is doing real work in exactly the direction that flatters the
+result. If I quoted "75% consistent" without that sentence I would be overselling it.
+
+The remaining honesty gap is that block_sd itself comes from only 5 contiguous blocks, so it is a
+noisy estimate of noise, and none of this is a formal confidence interval.
+
+---
+
+**13. What confounds your p_flip-versus-activity law?**
+
+The finding first: p_flip rises with log-activity, slope +0.111 per decade, R² = 0.26 across 121
+symbols, and it crosses 0.5 — of the 20 most active symbols 8 are anti-persistent at lag 1, and
+of the 20 least active, none are.
+
+The confound was **relative tick size**. Tick divided by price is a mechanical driver of bid-ask
+bounce and lag-1 alternation, and it correlates with activity on Binance perps — the busiest
+contracts tend to have a small tick relative to price. If p_flip is really tracking relative tick
+size, then activity is just a proxy and my competitive-response story is decoration on an
+artifact.
+
+I ran the joint regression (`p_flip ~ log10(n_events) + log10(rel_tick)`, Q4b,
+`results/q4b_tick_confound.md`) on 111 of the 121 symbols. Both coefficients survive: activity
++0.1130 (t≈7.14), relative tick size +0.0192 (t≈2.09) — smaller and noisier, but not zero by the
+rough t-ratio I use elsewhere. The two variables turned out less collinear than I assumed
+(corr = −0.21, not the strong entanglement the hypothesis implied), and univariate R² tells the
+same story: 0.294 for activity alone versus 0.002 for tick size alone. So the verdict is activity
+dominates, tick size is a real but minor second contributor — not the reverse, and not a clean
+acquittal either. Two things stop me calling it fully settled. Tick size came from Binance's
+*current* exchangeInfo, not June 2023's — a small, uncorrected error if any symbol's tick moved
+since. And the mainnet endpoint I meant to hit returned HTTP 451 (geo-blocked) from my execution
+environment, so this ran against the futures testnet mirror instead — schema-identical and
+spot-checked against BTCUSDT's known mainnet tick, but not verified symbol-by-symbol. Real result,
+documented substitute data source, not a fully clean mainnet confirmation.
+
+Two more I would flag unprompted. Survivorship: I dropped 86 symbols below 1M events, all of them
+low-activity, so the bottom of my regression is the most-active slice of an excluded population —
+which could flatten or steepen the slope, and I do not know which. And single-regime: this is one
+month, and Phase 1.5 measured these statistics to be regime-dependent, so I would want a disjoint
+month before calling it a law rather than a June fact.
+
+---
+
+**14. You found kernels decaying slower than critical. What would that mean for price diffusivity,
+and do you believe it?**
+
+What it would mean: β below (1−γ)/2 says the kernel does not decay fast enough to offset the
+flow's persistence, so impact accumulates and prices are mildly super-diffusive at the event
+scale — predictable directional drift after a trade. That is in principle tradeable, which is
+itself a reason for suspicion: it should not survive in the most liquid books.
+
+Do I believe it? Not as stated, for two reasons.
+
+First, it is in tension with my own other result. Q4 found the most active symbols flipping
+*anti*-persistently at lag 1 — sub-diffusive, mean-reverting pressure — and all four of my
+balance violations are mid-to-high-activity symbols. Both cannot be the dominant effect in the
+same book at the same scale. The most likely reconciliation is that they are different scales:
+anti-persistence is lag-1, and I fit β over lags 5–150, so a book can bounce at one event and
+trend over a hundred. The alternative I take seriously is that strong lag-1 alternation is
+corrupting the ACF that feeds my Toeplitz system, in which case both numbers are partly artifacts
+of the same zigzag.
+
+Second, and more fundamental: the relation β = (1−γ)/2 is *itself* a linear-propagator
+prediction, and my β̂ comes from a linear deconvolution. So a violation is equally consistent with
+"the market is super-diffusive" and with "impact is nonlinear here and my model is wrong" — most
+plausibly in the busiest, most contested books, which is exactly where the violations are. My
+analysis cannot distinguish those, and I would not claim it can.
+
+The honest summary is that Phase 2 produced two results that do not sit comfortably together. The
+next measurement is fitting β over disjoint lag windows to see whether the tension is scale
+separation or estimator contamination.
 
 ---
 
