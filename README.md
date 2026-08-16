@@ -128,12 +128,33 @@ R² = 0.2632**, climbing from a fitted 0.414 to 0.563 and crossing the 0.5 coin-
 cut: of the 20 most active symbols **8 are anti-persistent** (p_flip > 0.5, equivalently lag-1
 ACF < 0); of the 20 least active, **zero** are. The reading offered — long memory as roughly
 universal order-splitting behaviour, lag-1 structure as mechanical and competitive — is a
-**hypothesis, not a result**. The alternative this data cannot exclude is that p_flip tracks
-*relative tick size*, which correlates with activity; that would make the law a bid-ask-bounce
-artifact. Regression stderrs are heteroskedastic across symbols and are descriptive only, which
-is also why the γ̂ figure carries no per-symbol error bars.
+**hypothesis, not a result**. The candidate alternative was that p_flip tracks *relative tick
+size* rather than activity, which correlates with it; that would make the law a bid-ask-bounce
+artifact. **Tested in Q4b** (below): activity survives as the dominant driver, tick size is a
+real but minor second contributor. Regression stderrs are heteroskedastic across symbols and are
+descriptive only, which is also why the γ̂ figure carries no per-symbol error bars.
 
 [Full results and caveats →](results/q4_cross_section.md)
+
+#### Q4b — the tick-size confound is real but minor; activity still dominates
+
+![p_flip vs relative tick size](results/q4b_flip_vs_rel_tick.png)
+
+Q4's p_flip law regressed jointly against relative tick size (`tickSize / mean price`) on 111 of
+Q4's 121 symbols (10 dropped for missing current tick-size data, mostly delisted BUSD pairs).
+`p_flip ~ log10(n_events) + log10(rel_tick)`: **activity coefficient +0.1130 (t≈7.14), tick-size
+coefficient +0.0192 (t≈2.09)** — both distinguishable from noise by this project's rough t-ratio,
+but activity by a wide margin. The collinearity motivating the test was weaker than assumed
+(corr(log-activity, log-rel-tick) = **−0.21**), and univariate R² makes the imbalance clear:
+0.294 for activity alone versus 0.002 for tick size alone, 0.322 jointly. **Verdict: activity is
+the dominant driver of Q4's p_flip law; relative tick size is a real but minor second
+contributor, not the reverse.** Two caveats matter more than usual here: tick size is Binance's
+*current* `exchangeInfo`, not June 2023's, and the mainnet endpoint this analysis targeted
+returned HTTP 451 (geo-blocked) from the execution environment — the numbers above come from the
+futures **testnet** exchangeInfo mirror instead (schema-identical, spot-checked against
+BTCUSDT's known mainnet tick, not verified symbol-by-symbol against mainnet).
+
+[Full results and caveats →](results/q4b_tick_confound.md)
 
 #### Q5 — critical balance holds for 12 of 16, and the misses all lean one way
 
@@ -342,12 +363,16 @@ for a project whose goal is learning against published answer keys.
 
 ## Status
 
-Phase 1 (Q1–Q3), Phase 1.5 (Q0, Q1b) and Phase 2 (Q4, Q5) complete.
+Phase 1 (Q1–Q3), Phase 1.5 (Q0, Q1b), Phase 2 (Q4, Q5) and the tick-size confound test (Q4b)
+complete.
 
-Next, in order of how much it would change the conclusions: the **tick-size regression** that
-would settle whether Q4's p_flip law is real or a bid-ask-bounce proxy; **β fit over disjoint lag
-windows** to resolve whether Q4's anti-persistence and Q5's slow kernels are scale separation or
-estimator contamination; and a **repeat on a disjoint week and month**, since a single window
-cannot distinguish a law from a June. Still queued from Phase 1: block-bootstrap intervals on γ̂
-and the OFI slope, a Q3 bar-length sweep, and a signed-trade-volume comparison against book OFI —
+Next, in order of how much it would change the conclusions: **re-running Q4b against mainnet
+exchangeInfo** once network access allows it, to replace the testnet-mirror tick sizes used here
+(activity was found to dominate, tick size a real but minor contributor — see
+[Q4b](results/q4b_tick_confound.md) — but that verdict rests on a documented substitute data
+source); **β fit over disjoint lag windows** to resolve whether Q4's anti-persistence and Q5's
+slow kernels are scale separation or estimator contamination; and a **repeat on a disjoint week
+and month**, since a single window cannot distinguish a law from a June. Still queued from Phase
+1: block-bootstrap intervals on γ̂ and the OFI slope, a Q3 bar-length sweep, and a
+signed-trade-volume comparison against book OFI —
 all using data already on disk.

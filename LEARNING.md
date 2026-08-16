@@ -902,17 +902,30 @@ against — producing alternation, and this pressure scales with how contested t
 memory would then be a trader-behavior property and short-lag structure a market-structure
 property, which is why one tracks liquidity and the other does not.
 
-**What would falsify it.** The alternative I cannot rule out with this data is a **tick-size
-confound**. Relative tick size (tick divided by price) is a mechanical driver of bid-ask bounce
-and lag-1 alternation, and it correlates with activity — high-activity Binance perps tend to be
-the ones where the tick is small relative to price, and the low-activity tail includes
-low-priced coins where one tick is a large fraction of the spread. If p_flip is really tracking
-relative tick size, then "activity" is a proxy and the competitive-response story is decoration
-on a bid-ask-bounce artifact. **The test:** regress p_flip on relative tick size and on
-log-activity jointly and see which survives; equivalently, compare p_flip within activity-matched
-pairs that differ in tick size. This project has not run it. Neither has it ruled out a survivor
-bias — the 86 skipped symbols are all low-activity, so the low end of the regression is the
-most-active slice of an otherwise-excluded population.
+**What would falsify it — tested in Q4b.** The alternative was a **tick-size confound**: relative
+tick size (tick divided by price) is a mechanical driver of bid-ask bounce and lag-1 alternation,
+and it correlates with activity — high-activity Binance perps tend to be the ones where the tick
+is small relative to price. If p_flip is really tracking relative tick size, "activity" is a
+proxy and the competitive-response story is decoration on a bid-ask-bounce artifact. Q4b
+(`results/q4b_tick_confound.md`) ran the discriminating regression on 111 of Q4's 121 symbols
+(10 dropped for missing current tick-size data — mostly delisted BUSD pairs): `p_flip ~
+log10(n_events) + log10(rel_tick)` jointly. **Both coefficients survive.** Activity: coefficient
+**+0.1130** (t≈7.14); relative tick size: coefficient **+0.0192** (t≈2.09) — smaller and noisier,
+but not indistinguishable from zero by the rough t-ratio this project uses elsewhere. The
+collinearity motivating the test turned out weaker than assumed: corr(log-activity, log-rel-tick)
+= **−0.21**, not the strong entanglement the hypothesis implied. Joint R² (0.322) barely beats
+activity alone (0.294), while tick size alone explains almost nothing (R² = 0.002) — so the
+verdict is **activity is the dominant driver, tick size is a real but minor second contributor**,
+not the reverse. This does not fully clear the law: two caveats bite harder here than usual.
+First, tick size came from Binance's *current* exchangeInfo, not June 2023's — a small,
+uncorrected source of error if any symbol's tick changed since. Second, and larger: the mainnet
+`fapi.binance.com` endpoint this project meant to hit returned HTTP 451 (geo-blocked) from the
+execution environment; the numbers above come from the futures **testnet** exchangeInfo mirror
+instead (schema-identical, spot-checked against BTCUSDT's known mainnet tick, but not verified
+symbol-by-symbol against mainnet). Read this as a real result on a documented substitute data
+source, not a fully clean confirmation. Neither this nor Q4 has ruled out a survivor bias — the
+86 skipped symbols are all low-activity, so the low end of the regression is the most-active
+slice of an otherwise-excluded population.
 
 Also note that Q4's regression stderrs are worse than usually admitted: each symbol's γ̂ stderr
 already understates its own uncertainty (§5), and the understatement is **heteroskedastic** —
@@ -1341,16 +1354,25 @@ The finding first: p_flip rises with log-activity, slope +0.111 per decade, R² 
 symbols, and it crosses 0.5 — of the 20 most active symbols 8 are anti-persistent at lag 1, and
 of the 20 least active, none are.
 
-The confound I cannot rule out is **relative tick size**. Tick divided by price is a mechanical
-driver of bid-ask bounce and lag-1 alternation, and it correlates with activity on Binance perps —
-the busiest contracts tend to have a small tick relative to price, and the low-activity tail
-includes low-priced coins where one tick is a large fraction of the spread. If p_flip is really
-tracking relative tick size, then activity is just a proxy and my competitive-response story is
-decoration on an artifact.
+The confound was **relative tick size**. Tick divided by price is a mechanical driver of bid-ask
+bounce and lag-1 alternation, and it correlates with activity on Binance perps — the busiest
+contracts tend to have a small tick relative to price. If p_flip is really tracking relative tick
+size, then activity is just a proxy and my competitive-response story is decoration on an
+artifact.
 
-I would test it by regressing p_flip on log-activity and relative tick size jointly and seeing
-which coefficient survives, or by comparing activity-matched pairs that differ in tick size. I
-have not run it.
+I ran the joint regression (`p_flip ~ log10(n_events) + log10(rel_tick)`, Q4b,
+`results/q4b_tick_confound.md`) on 111 of the 121 symbols. Both coefficients survive: activity
++0.1130 (t≈7.14), relative tick size +0.0192 (t≈2.09) — smaller and noisier, but not zero by the
+rough t-ratio I use elsewhere. The two variables turned out less collinear than I assumed
+(corr = −0.21, not the strong entanglement the hypothesis implied), and univariate R² tells the
+same story: 0.294 for activity alone versus 0.002 for tick size alone. So the verdict is activity
+dominates, tick size is a real but minor second contributor — not the reverse, and not a clean
+acquittal either. Two things stop me calling it fully settled. Tick size came from Binance's
+*current* exchangeInfo, not June 2023's — a small, uncorrected error if any symbol's tick moved
+since. And the mainnet endpoint I meant to hit returned HTTP 451 (geo-blocked) from my execution
+environment, so this ran against the futures testnet mirror instead — schema-identical and
+spot-checked against BTCUSDT's known mainnet tick, but not verified symbol-by-symbol. Real result,
+documented substitute data source, not a fully clean mainnet confirmation.
 
 Two more I would flag unprompted. Survivorship: I dropped 86 symbols below 1M events, all of them
 low-activity, so the bottom of my regression is the most-active slice of an excluded population —
