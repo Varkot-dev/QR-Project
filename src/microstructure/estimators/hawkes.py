@@ -48,7 +48,7 @@ def simulate_hawkes_exp(mu: float, alpha: float, beta: float, t_end: float, seed
         >>> alpha, beta = 0.4, 2.0
         >>> t = np.linspace(0, 50, 200_000)
         >>> kernel_integral = np.trapezoid(alpha * beta * np.exp(-beta * t), t)
-        >>> abs(kernel_integral - alpha) < 1e-3
+        >>> bool(abs(kernel_integral - alpha) < 1e-3)
         True
 
     Algorithm (Ogata thinning, exploiting the exponential kernel's Markov
@@ -69,10 +69,16 @@ def simulate_hawkes_exp(mu: float, alpha: float, beta: float, t_end: float, seed
     """
     if beta <= 0.0:
         raise ValueError("beta must be positive")
-    if mu < 0.0:
-        raise ValueError("mu must be non-negative")
-    if alpha < 0.0:
-        raise ValueError("alpha must be non-negative")
+    if mu <= 0.0:
+        raise ValueError("mu must be positive")
+    if alpha < 0.0 or alpha >= 1.0:
+        raise ValueError(
+            f"alpha must be in [0, 1); got {alpha}. alpha >= 1 is explosive/"
+            "non-stationary (branching ratio >= 1, expected event count "
+            "diverges) and thinning would never terminate."
+        )
+    if t_end <= 0.0:
+        raise ValueError("t_end must be positive")
 
     rng = np.random.default_rng(seed)
     events: list[float] = []
@@ -132,7 +138,8 @@ def _excitation_recursion(decay: np.ndarray) -> np.ndarray:
     on up to ~10^5 events per call) — the loop's per-element Python
     overhead dominates runtime. This computes the same recursion with a
     Hillis-Steele parallel prefix scan: O(N log N) numpy vector ops
-    instead of O(N) Python-level iterations, ~8-10x faster in practice
+    instead of O(N) Python-level iterations, measured ~5x faster in
+    practice (whole-fit wall clock, ~16.4s -> ~3.2s on an 83k-event fit)
     for N ~ 10^4-10^5 despite the extra log-factor work, because every
     step here is a vectorized numpy op rather than a scalar Python one.
     Each scan step combines affine maps (a1,b1) then (a2,b2) via
@@ -216,8 +223,13 @@ def _nelder_mead(
     """Minimal Nelder-Mead simplex minimizer (numpy only, no scipy).
 
     Standard reflection/expansion/contraction/shrink algorithm (Nelder &
-    Mead 1965). Convergence criterion: the spread of function values
-    across the simplex (max - min) falls below `tol`.
+    Mead 1965), including the outside-vs-inside contraction distinction:
+    when the reflected point beats the worst point but not the
+    second-worst, contract toward whichever of {reflected, worst} is
+    better (outside contraction toward reflected if it improved on worst,
+    inside contraction toward worst otherwise). Convergence criterion:
+    the spread of function values across the simplex (max - min) falls
+    below `tol`.
     """
     dim = x0.size
     alpha_r, gamma_e, rho_c, sigma_s = 1.0, 2.0, 0.5, 0.5  # standard coefficients
@@ -266,10 +278,17 @@ def _nelder_mead(
                 values[-1] = reflected_val
             continue
 
-        # Contraction (reflected_val >= values[-2])
-        contracted = centroid + rho_c * (worst - centroid)
+        # Contraction (reflected_val >= values[-2]): outside vs inside per
+        # the standard algorithm. If the reflected point beat the worst
+        # point, contract toward the reflected point (outside contraction);
+        # otherwise contract toward the original worst point (inside
+        # contraction) since reflection didn't even improve on worst.
+        if reflected_val < worst_val:
+            contracted = centroid + rho_c * (reflected - centroid)
+        else:
+            contracted = centroid + rho_c * (worst - centroid)
         contracted_val = f(contracted)
-        if contracted_val < worst_val:
+        if contracted_val < min(reflected_val, worst_val):
             simplex[-1] = contracted
             values[-1] = contracted_val
             continue
@@ -299,6 +318,22 @@ def fit_hawkes_exp(times: np.ndarray, t_end: float) -> HawkesFit:
     documented in research/02 §4 pitfall 5) and returns the best-loglik
     result. `converged` is True iff the winning start's simplex satisfies
     the Nelder-Mead spread-in-loglik convergence criterion (tol=1e-6).
+
+    CAVEAT on `converged`: this reflects ONLY that the simplex's
+    function values stopped spreading out — i.e. the optimizer found a
+    local optimum of the likelihood surface it could no longer improve
+    on with small moves. It does NOT mean the parameters themselves are
+    well identified. Near n≈1 the likelihood surface can have a long,
+    shallow ridge along which mu and alpha trade off (a small-mu/high-n
+    combination looks locally like a big-mu/low-n one — research/02 §4
+    pitfall 5), so a fit can report `converged=True` while sitting
+    anywhere along that ridge; the reported point estimate is then much
+    less trustworthy than `converged=True` alone would suggest. Multi-
+    start helps but does not eliminate this — treat `converged=True`
+    near the boundary of alpha as a weaker signal than the same flag
+    away from it, and prefer profile-likelihood or multi-seed spread
+    checks (as in test_mle_alpha_stable_across_seeds) over trusting a
+    single fit's convergence flag in that regime.
     """
     if times.size < 2:
         raise ValueError("need at least 2 events to fit")
@@ -365,10 +400,9 @@ def branching_count_variance(times: np.ndarray, window: float, t_end: float) -> 
 
     Raises ValueError if fewer than 20 non-overlapping windows fit in
     [0, t_end], if window is so small it would require an unreasonable
-    number of bins (>10^7 — almost certainly a units mistake, not a
-    legitimate analysis), or if the count variance is zero (degenerate/
-    regular spacing), since none of these leave the estimator
-    statistically meaningful.
+    number of bins (>10^9 — see max_windows derivation below), or if the
+    count variance is zero (degenerate/regular spacing), since none of
+    these leave the estimator statistically meaningful.
     """
     if window <= 0.0:
         raise ValueError("window must be positive")
@@ -379,7 +413,18 @@ def branching_count_variance(times: np.ndarray, window: float, t_end: float) -> 
             f"need at least 20 non-overlapping windows, got {n_windows} "
             f"(t_end={t_end}, window={window})"
         )
-    max_windows = 10_000_000
+    # `edges = np.arange(n_windows + 1) * window` below allocates one
+    # int64 (8 bytes) per bin edge. At the cap, 1e9 edges * 8 bytes = 8GB
+    # — a large but single, bounded, non-swap-inducing allocation on a
+    # modern dev/CI machine. This still guards the genuine pathology (a
+    # window many orders of magnitude too small for t_end — e.g. window=
+    # 1e-9 with t_end=1e4 would ask for ~1e13 edges, ~80TB, the case that
+    # motivated this cap in the first place) while comfortably allowing
+    # legitimate sub-millisecond windows: 1e9 windows at window=1ms spans
+    # ~1e6s (~11.5 days) of t_end, more than enough for a multi-day
+    # trading-time analysis. Widen further only with an explicit reason —
+    # 8GB is already a lot to ask a laptop for from a single call.
+    max_windows = 1_000_000_000
     if n_windows > max_windows:
         raise ValueError(
             f"window={window} implies {n_windows} windows over t_end={t_end}, "

@@ -95,6 +95,49 @@ def test_loglik_matches_numerical_intensity_integration():
 
 
 # ---------------------------------------------------------------------------
+# Group 0c: simulate_hawkes_exp must reject explosive/invalid parameters at
+# entry rather than hang. alpha >= 1 makes the branching ratio >= 1, so the
+# expected number of descendants per event is infinite/non-convergent and
+# Ogata thinning's while loop (bounded by t_end but driven by ever-growing
+# excitation) never reaches t_end in finite time/memory. Verified: alpha=1.5
+# never terminates without this guard.
+# ---------------------------------------------------------------------------
+
+
+def test_simulate_rejects_alpha_at_or_above_one():
+    with pytest.raises(ValueError):
+        simulate_hawkes_exp(0.5, 1.0, 2.0, 1000.0, seed=1)
+    with pytest.raises(ValueError):
+        simulate_hawkes_exp(0.5, 1.5, 2.0, 1000.0, seed=1)
+
+
+def test_simulate_rejects_negative_alpha():
+    with pytest.raises(ValueError):
+        simulate_hawkes_exp(0.5, -0.1, 2.0, 1000.0, seed=1)
+
+
+def test_simulate_rejects_non_positive_mu():
+    with pytest.raises(ValueError):
+        simulate_hawkes_exp(0.0, 0.4, 2.0, 1000.0, seed=1)
+    with pytest.raises(ValueError):
+        simulate_hawkes_exp(-0.1, 0.4, 2.0, 1000.0, seed=1)
+
+
+def test_simulate_rejects_non_positive_beta():
+    with pytest.raises(ValueError):
+        simulate_hawkes_exp(0.5, 0.4, 0.0, 1000.0, seed=1)
+    with pytest.raises(ValueError):
+        simulate_hawkes_exp(0.5, 0.4, -1.0, 1000.0, seed=1)
+
+
+def test_simulate_rejects_non_positive_t_end():
+    with pytest.raises(ValueError):
+        simulate_hawkes_exp(0.5, 0.4, 2.0, 0.0, seed=1)
+    with pytest.raises(ValueError):
+        simulate_hawkes_exp(0.5, 0.4, 2.0, -100.0, seed=1)
+
+
+# ---------------------------------------------------------------------------
 # Group 1: simulate -> fit round trip across 3 seeds.
 # ---------------------------------------------------------------------------
 
@@ -186,7 +229,16 @@ def test_near_critical_mle_recovers_within_widened_tolerance():
 
 
 def test_poisson_refutation_both_estimators_report_near_zero():
-    """A pure Poisson stream (alpha=0) must NOT look self-exciting."""
+    """A pure Poisson stream (alpha=0) must NOT look self-exciting.
+
+    Note: we only assert on fit.alpha here, not fit.beta. When the true
+    process has no self-excitation, beta (the kernel decay rate) is
+    unidentified/degenerate at alpha=0 — there's no kernel timescale to
+    recover, since the excitation term alpha*beta*R_i vanishes regardless
+    of beta once alpha->0. The MLE surface is essentially flat in beta at
+    that point, so a fitted beta value is not meaningful evidence of
+    anything here and correctly is not asserted on.
+    """
     rng = np.random.default_rng(21)
     rate = 1.0
     t_end = 200_000.0
@@ -220,9 +272,11 @@ def test_regime_switching_poisson_produces_spurious_endogeneity_trap():
     Hawkes/branching-ratio estimate computed on a non-stationary-rate
     series conflates "the rate changes over time" with "events cause more
     events," and the two are observationally similar in aggregate count
-    statistics. We assert n_hat > 0.2 here specifically to document that
-    the spurious effect is not a rounding error — it is large enough to
-    be mistaken for real, moderate endogeneity.
+    statistics. We assert n_hat > 0.2 for count-variance and fitted
+    alpha > 0.5 for the MLE here specifically to document that the
+    spurious effect is not a rounding error in either estimator — it is
+    large enough, in both, to be mistaken for real, moderate-to-severe
+    endogeneity.
     """
     rng = np.random.default_rng(22)
     low_rate, high_rate = 0.5, 2.0
@@ -251,4 +305,11 @@ def test_regime_switching_poisson_produces_spurious_endogeneity_trap():
     assert n_hat > 0.2, (
         f"expected the regime-switching trap to produce spurious n_hat > 0.2, "
         f"got {n_hat}"
+    )
+
+    fit_times = times_arr[times_arr <= FIT_SUBSAMPLE_T]
+    fit = fit_hawkes_exp(fit_times, FIT_SUBSAMPLE_T)
+    assert fit.alpha > 0.5, (
+        f"expected the regime-switching trap to also fool the MLE with "
+        f"fitted alpha > 0.5, got {fit.alpha}"
     )
