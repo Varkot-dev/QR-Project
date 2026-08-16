@@ -395,16 +395,24 @@ from being trivially predictable, i.e. that keeps `R(ℓ) ~ ℓ^(1−2β)` growi
 diffusively. At γ = 0.24 that gives β ≈ 0.38, and a pure power-law accumulation predicts
 
 ```
-R(500)/R(1) = 500^(1−2β) = 500^γ ≈ 500^0.24 ≈ 4.8×
+R(500)/R(1) = 500^(1−2β) = 500^γ ≈ 500^0.24 ≈ 4.4×
 ```
 
-Letting the lag-1 sign autocorrelation range over a plausible 0.2–0.4 (a band, not something fit
-to this data) widens that prediction to roughly **3.5×–6.9×**.
+(ETH's exact measured γ = 0.23796 gives 4.39×.)
 
-**We measured 5.3939×.** Inside the band, near its middle. A number derived from Q1's exponent
-on two months of *trades* predicts a ratio measured in Q2 from 14 days of *quotes* — two
-different datasets, two different estimators, one consistent theory. That is much stronger
-evidence that both analyses are correct than either result is on its own.
+Letting the lag-1 sign autocorrelation range over a plausible 0.2–0.4 widens that point
+prediction to roughly **3.5×–6.9×**. Be precise about where those endpoints come from, because
+it is easy to overstate their authority: they correspond to *effective exponents*
+γ_eff ≈ 0.202 and γ_eff ≈ 0.310, since `500^0.202 ≈ 3.5×` and `500^0.310 ≈ 6.9×`. The 0.2–0.4
+autocorrelation range is a **heuristic input** used to motivate that spread of effective
+exponents — it is not propagated through the model analytically. So the band is a plausibility
+envelope, not a derived confidence interval, and "inside the band" is a weaker statement than a
+statistical test.
+
+**We measured 5.3939×** — inside the band, above the 4.4× point prediction. A number derived
+from Q1's exponent on two months of *trades* predicts the scale of a ratio measured in Q2 from
+14 days of *quotes* — two different datasets, two different estimators, one consistent theory.
+That is stronger evidence that both analyses are correct than either result is on its own.
 
 One important limit on what that agreement proves: the toy band predicts the **magnitude** of
 the rise, not its **shape**. The calculation assumes `R(ℓ) ~ ℓ^γ` all the way out to ℓ = 500, but
@@ -791,12 +799,21 @@ trades before a slow decline.
 I measured R(1) = 0.0104 rising to a plateau near 0.056 around ℓ ≈ 300–500 — a ratio of 5.39×.
 And here is the check that convinced me: taking Q1's ETH exponent γ ≈ 0.24 and the
 diffusivity-consistent kernel exponent β = (1−γ)/2 ≈ 0.38, the predicted R(500)/R(1) is
-500^γ ≈ 4.8×, or roughly 3.5–6.9× allowing lag-1 sign autocorrelation in 0.2–0.4. I measured
-5.39×, inside that band — from a different dataset with a different estimator.
+500^γ ≈ 4.4×, or roughly 3.5–6.9× — endpoints corresponding to effective exponents of about
+0.202 and 0.310, motivated heuristically by letting lag-1 sign autocorrelation range over
+0.2–0.4. I measured 5.39×, inside that band and above the point prediction, from a different
+dataset with a different estimator.
 
-I should be honest that I initially wrote this up as a departure from Bouchaud. The measurement
-was right and the framing was backwards; review caught it. And I still cannot claim to have
-measured G — separating kernel from flow memory needs propagator deconvolution, which I did not do.
+I'd flag two limits on that check rather than let it carry more weight than it should. The band
+is a plausibility envelope, not a confidence interval — the autocorrelation range is a heuristic
+input, not something propagated analytically. And it constrains the magnitude of the rise, not
+its shape: R has largely plateaued by ℓ ≈ 100, with R(500)/R(100) = 1.056× against 1.47× for a
+pure power law, so the functional form is not what the agreement supports.
+
+I should also be honest that I initially wrote this up as a departure from Bouchaud. The
+measurement was right and the framing was backwards; review caught it. And I still cannot claim
+to have measured G — separating kernel from flow memory needs propagator deconvolution, which I
+did not do.
 
 ---
 

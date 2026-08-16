@@ -54,9 +54,14 @@ _MAX_DROP_FRACTION = 0.01
 # beta = (1 - gamma) / 2 (Bouchaud et al. 2004's propagator-diffusivity relation, which
 # requires R(l) ~ l^(1-2*beta) to grow no faster than diffusively), a pure power-law
 # accumulation R(l) ~ l^(1-2*beta) predicts R(500)/R(1) = 500^(1-2*beta) = 500^gamma.
-# At gamma=0.24 that's 500^0.24 ~= 4.8x; allowing the underlying lag-1 sign
-# autocorrelation to range over [0.2, 0.4] (a plausible band, not fit to this data)
-# shifts the effective exponent enough to span roughly 3.5x-6.9x.
+# At gamma=0.24 that's 500^0.24 ~= 4.4x (ETH's exact gamma=0.23796 gives 4.39x).
+# The band endpoints correspond to effective exponents gamma_eff ~= 0.202 and 0.310,
+# i.e. 500^0.202 ~= 3.5x and 500^0.310 ~= 6.9x. Letting the underlying lag-1 sign
+# autocorrelation range over [0.2, 0.4] is a HEURISTIC input used to motivate that
+# gamma_eff range -- it is not propagated through the model analytically. The band is
+# therefore a plausibility envelope, not a derived confidence interval, and it speaks
+# to the MAGNITUDE of the rise, not its functional form (measured R(500)/R(100)=1.056x
+# vs 1.47x for a pure power law, so R has largely plateaued by l~100).
 _PREDICTED_RISE_BAND = (3.5, 6.9)
 
 
