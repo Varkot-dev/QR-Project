@@ -105,6 +105,22 @@ def test_run_q4_recovers_distinct_acf1_skips_and_reports_failures(tmp_path: Path
     assert (out_dir / "q4_gamma_vs_activity.png").exists()
     assert (out_dir / "q4_flip_vs_activity.png").exists()
 
+    # --- parquet output round-trips with the right height and columns ---
+    parquet_out = out_dir / "q4_cross_section.parquet"
+    assert parquet_out.exists()
+    pq = pl.read_parquet(parquet_out)
+    assert pq.height == len(result["symbols"])
+    assert set(pq.columns) == {
+        "symbol", "n_events", "gamma", "gamma_stderr", "acf1", "p_flip",
+        "zigzag_amplitude", "total_qty",
+    }
+    pq_by_symbol = {row["symbol"]: row for row in pq.to_dicts()}
+    for sym, expected in expected_acf1.items():
+        assert sym in pq_by_symbol
+        assert abs(pq_by_symbol[sym]["acf1"] - expected) < 0.03
+        assert pq_by_symbol[sym]["n_events"] == n_events_by_symbol[sym]
+        assert pq_by_symbol[sym]["gamma_stderr"] == by_symbol[sym]["stderr"]
+
 
 def test_run_q4_never_aborts_on_all_failures(tmp_path: Path):
     """If every symbol fails/skips, run_q4 must still return cleanly (no raise)."""
@@ -118,3 +134,12 @@ def test_run_q4_never_aborts_on_all_failures(tmp_path: Path):
     assert result["failures"][0]["symbol"] == "GHOSTUSDT"
     assert (out_dir / "q4_cross_section.md").exists()
     assert (out_dir / "q4_cross_section.json").exists()
+
+    parquet_out = out_dir / "q4_cross_section.parquet"
+    assert parquet_out.exists()
+    pq = pl.read_parquet(parquet_out)
+    assert pq.height == 0
+    assert set(pq.columns) == {
+        "symbol", "n_events", "gamma", "gamma_stderr", "acf1", "p_flip",
+        "zigzag_amplitude", "total_qty",
+    }

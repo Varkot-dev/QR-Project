@@ -10,7 +10,12 @@ total traded quantity. Symbols with fewer than `min_events` events are
 skipped (not failed); any other per-symbol error (missing parquet, bad
 schema, etc.) is caught and logged as a failure. Neither skips nor
 failures abort the run. Frames are processed and released one symbol at a
-time to bound memory across the ~207-symbol universe.
+time to bound memory across the ~207-symbol universe (each symbol's
+events are loaded exactly once, not reloaded for the min_events check).
+
+Outputs: q4_cross_section.{json,md,parquet} plus two PNGs. The parquet
+table holds one row per successful symbol (columns: symbol, n_events,
+gamma, gamma_stderr, acf1, p_flip, zigzag_amplitude, total_qty).
 
 Two cross-sectional OLS regressions are then fit on the successful set:
 gamma-hat on log10(n_events), and p_flip on log10(n_events). Plain
@@ -37,6 +42,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import polars as pl
 
 from microstructure.data.catalog import parquet_path
 from microstructure.estimators.acf import fit_power_law, sign_acf
@@ -51,14 +57,17 @@ def _zigzag_amplitude(acf: np.ndarray) -> float:
     return float(acf[EVEN_LAGS].mean() - acf[ODD_LAGS].mean())
 
 
-def _symbol_stats(root: Path, symbol: str, period: str, max_lag: int) -> dict:
-    """Compute all per-symbol stats. Raises on any failure; caller catches."""
-    ev = load_events(root, symbol, [period])
+def _symbol_stats(ev: pl.DataFrame, symbol: str, max_lag: int) -> dict:
+    """Compute all per-symbol stats from an already-loaded events frame.
+
+    Takes ownership of `ev` in the sense that the caller should not use it
+    after this call returns (arrays are extracted immediately and the
+    frame is not retained here, so the caller is free to `del` it).
+    """
     signs = ev["sign"].to_numpy()
     qty = ev["qty"].to_numpy()
     n_events = int(signs.size)
     total_qty = float(qty.sum())
-    del ev, qty
 
     acf = sign_acf(signs, max_lag)
     fit = fit_power_law(acf, lo=FIT_LO, hi=max_lag // 2)
@@ -138,19 +147,18 @@ def run_q4(
             failures.append({"symbol": symbol, "reason": f"parquet not found: {p}"})
             continue
         try:
-            # Peek n_events cheaply is not available without loading; load
-            # once and check min_events before computing expensive stats
-            # would still require the full sign series for n_events itself,
-            # so we compute after load but check min_events before the ACF
-            # fit (which is the expensive step) to save work on tiny frames.
+            # Load once: n_events (from the loaded frame's height) is
+            # checked against min_events before the expensive ACF fit, but
+            # the frame itself is only loaded a single time and passed
+            # straight into _symbol_stats — no second load_events call.
             ev = load_events(root, symbol, [period])
             n_events = ev.height
             if n_events < min_events:
                 skips.append({"symbol": symbol, "reason": "below min_events", "n_events": n_events})
                 del ev
                 continue
+            stats = _symbol_stats(ev, symbol, max_lag)
             del ev
-            stats = _symbol_stats(root, symbol, period, max_lag)
             records.append(stats)
         except Exception as e:  # noqa: BLE001 - per-symbol robustness is the point
             failures.append({"symbol": symbol, "reason": f"{type(e).__name__}: {e}"})
@@ -174,8 +182,48 @@ def run_q4(
     _plot_gamma_vs_activity(out_dir, records)
     _plot_flip_vs_activity(out_dir, records)
     _write_results_md(out_dir, result)
+    _write_results_parquet(out_dir, records)
     (out_dir / "q4_cross_section.json").write_text(json.dumps(result, indent=2))
     return result
+
+
+_PARQUET_COLUMNS = [
+    "symbol", "n_events", "gamma", "gamma_stderr", "acf1", "p_flip",
+    "zigzag_amplitude", "total_qty",
+]
+
+
+def _write_results_parquet(out_dir: Path, records: list[dict]) -> None:
+    """Write the successful per-symbol records as a parquet table.
+
+    Columns: symbol, n_events, gamma, gamma_stderr, acf1, p_flip,
+    zigzag_amplitude, total_qty. `stats.stderr` is renamed to
+    `gamma_stderr` in this table only (it's the stderr on gamma
+    specifically, and the json/md keep the shorter `stderr` key for
+    backward-compat with the rest of this module's records).
+    """
+    if records:
+        rows = [
+            {
+                "symbol": r["symbol"],
+                "n_events": r["n_events"],
+                "gamma": r["gamma"],
+                "gamma_stderr": r["stderr"],
+                "acf1": r["acf1"],
+                "p_flip": r["p_flip"],
+                "zigzag_amplitude": r["zigzag_amplitude"],
+                "total_qty": r["total_qty"],
+            }
+            for r in records
+        ]
+        df = pl.DataFrame(rows)
+    else:
+        df = pl.DataFrame(schema={
+            "symbol": pl.Utf8, "n_events": pl.Int64, "gamma": pl.Float64,
+            "gamma_stderr": pl.Float64, "acf1": pl.Float64, "p_flip": pl.Float64,
+            "zigzag_amplitude": pl.Float64, "total_qty": pl.Float64,
+        })
+    df.write_parquet(out_dir / "q4_cross_section.parquet")
 
 
 def _plot_gamma_vs_activity(out_dir: Path, records: list[dict]) -> None:
@@ -313,14 +361,17 @@ def _write_results_md(out_dir: Path, result: dict) -> None:
 
     if records:
         sorted_records = sorted(records, key=lambda r: r["n_events"], reverse=True)
-        top10 = sorted_records[:10]
-        bottom10 = sorted_records[-10:] if len(sorted_records) > 10 else []
+        n_top = min(10, len(sorted_records))
+        top_n = sorted_records[:n_top]
+        # Only show a separate lowest-activity table when it wouldn't just
+        # repeat rows already shown above.
+        bottom_n = sorted_records[-n_top:] if len(sorted_records) > n_top else []
 
-        lines.append("## Top-10 by activity (n_events)")
+        lines.append(f"## Highest activity ({n_top} by n_events)")
         lines.append("")
         lines.append("| symbol | n_events | γ̂ | stderr | acf1 | p_flip | zigzag | total_qty |")
         lines.append("|---|---|---|---|---|---|---|---|")
-        for r in top10:
+        for r in top_n:
             lines.append(
                 f"| {r['symbol']} | {r['n_events']:,} | {r['gamma']:.4f} | {r['stderr']:.4f} | "
                 f"{r['acf1']:.4f} | {r['p_flip']:.4f} | {r['zigzag_amplitude']:.4f} | "
@@ -328,12 +379,12 @@ def _write_results_md(out_dir: Path, result: dict) -> None:
             )
         lines.append("")
 
-        if bottom10:
-            lines.append("## Bottom-10 by activity (n_events)")
+        if bottom_n:
+            lines.append(f"## Lowest activity ({len(bottom_n)} by n_events)")
             lines.append("")
             lines.append("| symbol | n_events | γ̂ | stderr | acf1 | p_flip | zigzag | total_qty |")
             lines.append("|---|---|---|---|---|---|---|---|")
-            for r in bottom10:
+            for r in bottom_n:
                 lines.append(
                     f"| {r['symbol']} | {r['n_events']:,} | {r['gamma']:.4f} | {r['stderr']:.4f} | "
                     f"{r['acf1']:.4f} | {r['p_flip']:.4f} | {r['zigzag_amplitude']:.4f} | "
