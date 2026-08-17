@@ -1,0 +1,188 @@
+{
+  "month": "2023-06",
+  "horizon_events": 2000,
+  "n_children": 20,
+  "parent_qty_events_list": [
+    2.0,
+    10.0
+  ],
+  "panel_symbols": [
+    "BTCUSDT",
+    "XRPUSDT",
+    "SOLUSDT",
+    "ARBUSDT",
+    "APTUSDT",
+    "BCHUSDT"
+  ],
+  "calibration": {
+    "days": [
+      "2023-06-01",
+      "2023-06-02",
+      "2023-06-03"
+    ],
+    "grid": [
+      [
+        50,
+        0.2
+      ],
+      [
+        50,
+        0.4
+      ],
+      [
+        200,
+        0.2
+      ],
+      [
+        200,
+        0.4
+      ]
+    ],
+    "scores": {
+      "50_0.2": 0.020050555555535705,
+      "50_0.4": 0.017306249999995457,
+      "200_0.2": -0.011926111111158674,
+      "200_0.4": -0.0005627777777824114
+    },
+    "chosen_params": {
+      "lookback": 50,
+      "pause_threshold": 0.2
+    }
+  },
+  "evaluation": {
+    "days": [
+      "2023-06-04",
+      "2023-06-05",
+      "2023-06-06",
+      "2023-06-07"
+    ],
+    "summary": {
+      "twap": {
+        "mean_shortfall": 0.016098991374462083,
+        "sd_shortfall": 5.20875464502486,
+        "n": 96
+      },
+      "frontloaded": {
+        "mean_shortfall": 0.13055093027713358,
+        "sd_shortfall": 0.3404215115219019,
+        "n": 96
+      },
+      "reactive": {
+        "mean_shortfall": -0.011139237792196374,
+        "sd_shortfall": 5.270808804758333,
+        "n": 96
+      }
+    },
+    "per_symbol": [
+      {
+        "symbol": "BTCUSDT",
+        "twap": {
+          "mean_shortfall": 0.0889912146808089,
+          "sd_shortfall": 12.754342812395903,
+          "n": 16
+        },
+        "frontloaded": {
+          "mean_shortfall": 0.7535707476588551,
+          "sd_shortfall": 0.47859673825618454,
+          "n": 16
+        },
+        "reactive": {
+          "mean_shortfall": -0.07288378531914289,
+          "sd_shortfall": 12.906381689322897,
+          "n": 16
+        }
+      },
+      {
+        "symbol": "XRPUSDT",
+        "twap": {
+          "mean_shortfall": 5.311069521523191e-05,
+          "sd_shortfall": 0.0006719127924315608,
+          "n": 16
+        },
+        "frontloaded": {
+          "mean_shortfall": 8.815934990279595e-05,
+          "sd_shortfall": 4.5526774741490455e-05,
+          "n": 16
+        },
+        "reactive": {
+          "mean_shortfall": 4.561069521523345e-05,
+          "sd_shortfall": 0.0006732648443466919,
+          "n": 16
+        }
+      },
+      {
+        "symbol": "SOLUSDT",
+        "twap": {
+          "mean_shortfall": 0.0006987088282698565,
+          "sd_shortfall": 0.042418316926036974,
+          "n": 16
+        },
+        "frontloaded": {
+          "mean_shortfall": 0.004210712369622442,
+          "sd_shortfall": 0.002509915435427085,
+          "n": 16
+        },
+        "reactive": {
+          "mean_shortfall": -0.00016379117173002077,
+          "sd_shortfall": 0.0428776222036357,
+          "n": 16
+        }
+      },
+      {
+        "symbol": "ARBUSDT",
+        "twap": {
+          "mean_shortfall": 7.244917789353936e-05,
+          "sd_shortfall": 0.0052018831841559345,
+          "n": 16
+        },
+        "frontloaded": {
+          "mean_shortfall": 0.00035027874052768386,
+          "sd_shortfall": 0.00020115337335008666,
+          "n": 16
+        },
+        "reactive": {
+          "mean_shortfall": 8.182417789354605e-05,
+          "sd_shortfall": 0.005202597307088962,
+          "n": 16
+        }
+      },
+      {
+        "symbol": "APTUSDT",
+        "twap": {
+          "mean_shortfall": 0.0006630727453352751,
+          "sd_shortfall": 0.03671244466519775,
+          "n": 16
+        },
+        "frontloaded": {
+          "mean_shortfall": 0.003282622138708991,
+          "sd_shortfall": 0.0018842741111599352,
+          "n": 16
+        },
+        "reactive": {
+          "mean_shortfall": 0.00053182274533526,
+          "sd_shortfall": 0.03676965938253576,
+          "n": 16
+        }
+      },
+      {
+        "symbol": "BCHUSDT",
+        "twap": {
+          "mean_shortfall": 0.006115392119249972,
+          "sd_shortfall": 0.3223535371810633,
+          "n": 16
+        },
+        "frontloaded": {
+          "mean_shortfall": 0.02180306140518449,
+          "sd_shortfall": 0.012020543309151616,
+          "n": 16
+        },
+        "reactive": {
+          "mean_shortfall": 0.005552892119250544,
+          "sd_shortfall": 0.3256496664774787,
+          "n": 16
+        }
+      }
+    ]
+  },
+  "failures": []
+}
