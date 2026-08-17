@@ -4,15 +4,18 @@ Empirical measurement of order-flow memory and price impact on Binance USDT-M pe
 from raw tick data. Three classical microstructure results — long-memory order flow, the price
 response function, and order-flow-imbalance linearity — replicated on crypto and benchmarked
 against the published equities literature, then carried to a **121-symbol cross-section** and a
-**propagator deconvolution** that separates the bare impact kernel from flow memory.
+**propagator deconvolution** that separates the bare impact kernel from flow memory, and finally
+to a **41-symbol Hawkes endogeneity panel** and an **execution-cost replay** built on the kernels
+those phases measured.
 
 This is a learning-first research project. Every Phase-1 result was chosen because a published
 benchmark exists to check it against; novelty is explicitly not the goal. Each result is reported
 with its sample period, sample size, standard error, and the specific reasons it might be wrong.
 
 **If you are here to understand the concepts rather than run the code, read
-[LEARNING.md](LEARNING.md)** — it explains the order book, autocorrelation, impact, OFI, and the
-statistics behind every number below, and closes with an interview drill.
+[LEARNING.md](LEARNING.md)** — it explains the order book, autocorrelation, impact, OFI, Hawkes
+self-excitation, and the statistics behind every number below, and closes with an 18-question
+interview drill.
 
 ## Data
 
@@ -20,7 +23,7 @@ statistics behind every number below, and closes with an interview drill.
 |---|---|
 | Source | [data.binance.vision](https://data.binance.vision) public dumps (free, no account) |
 | Market | USDT-M perpetual futures |
-| Symbols | BTCUSDT, ETHUSDT (Phase 1); a 207-symbol universe, 121 analyzed (Phase 2) |
+| Symbols | BTCUSDT, ETHUSDT (Phase 1); a 207-symbol universe, 121 analyzed (Phase 2); a 41-symbol endogeneity panel and a 6-symbol execution panel (Phase 3) |
 | `aggTrades` | **105,147,096** raw prints — BTC + ETH, 2023-06 and 2023-07 |
 | `bookTicker` | **114,231,299** L1 quote updates — ETH, **14 days**, 2023-06-01 to 2023-06-14 |
 | Resolution | millisecond timestamps |
@@ -179,6 +182,69 @@ simply being the wrong model for those books.
 
 [Full results and caveats →](results/q5_kernel_panel.md)
 
+### Phase 3 — self-excitation and execution
+
+Phase 3 asks how much of the order flow is the market reacting to itself, and then whether knowing
+that changes how an order should be executed. It adds a Hawkes toolkit (simulator, MLE,
+model-free branching-ratio estimator), a business-time deseasonalizer, and an execution-cost
+replay simulator.
+
+#### Q6 — ~70% of trades are reactions to trades, and endogeneity does not track liquidity
+
+![Branching-ratio panel](results/q6_endogeneity.png)
+
+The Hawkes branching ratio — the fraction of events that are endogenous echoes rather than
+arrivals from outside — fit across a **41-symbol** panel of 2023-06 aggressor flow (**41
+successful, 0 failed**), six contiguous business-time sub-windows per symbol. **Median α̂ =
+0.7070**, ranging 0.3699 to 0.8790: roughly **70% of aggressor events are reactions to other
+aggressor events**, and total activity is amplified about 3.4× over the exogenous flow driving it.
+It is high endogeneity but **not near-critical — zero of 41 symbols reach α̂ ≥ 0.9**, distance
+from criticality 0.2930 at the median. **That number is a lower bound, and the headline must say
+so:** an exponential kernel truncates the long-range excitation a power-law kernel would capture,
+so a power-law refit would push every number upward — which is exactly the mechanism Hardiman et
+al. (2013) used to overturn Filimonov & Sornette's original reflexivity trend, and why this is not
+directly comparable to Mark, Šíla & Weber's (2022) power-law crypto estimates. Two further
+results. **Endogeneity is liquidity-invariant**: regressed on log₁₀(activity), slope **+0.0286**
+with stderr 0.1094 and **R² = 0.0017** — the stderr is four times the slope. And the **two
+estimators disagree, one-directionally, on every symbol**: median |α̂_MLE − n̂_count-variance| =
+**0.2395** (correlation 0.2597), with count-variance reading higher on **41 of 41**. Unanimity is
+not noise; it is a misspecification signal pointing at the exponential kernel — though window
+sensitivity in the count-variance estimator is a competing explanation this data cannot rule out.
+Reported side by side rather than averaged.
+
+Separately, the seasonality correction this whole analysis is built on was **measured, not
+assumed**: on a regime-switching Poisson process with *no* self-excitation at all, this repo's own
+estimators report a spurious **n̂ = 0.934** and **α̂ = 0.976** — but the measured bias on the real
+panel is **median raw_delta = −0.0003**. Crypto perps trade 24/7 with no open, close, or lunch
+lull, so the intraday profile is nearly flat and there is little confound to remove. The armor was
+necessary to prove the threat was small here; see
+[LEARNING.md §7.2](LEARNING.md#72-the-trap-the-cure-and-why-measuring-a-near-zero-correction-was-not-wasted-work).
+
+[Full results and caveats →](results/q6_endogeneity.md)
+
+#### Q7 — a risk/cost frontier, not a winner
+
+![Execution cost comparison](results/q7_execution.png)
+
+Three execution schedules — TWAP, front-loaded, and Hawkes-motivated flow-reactive — costed
+against replayed 2023-06 flow on 6 panel symbols under one shared model (adverse drift +
+half-spread + own-impact from each symbol's **own measured Q5 kernel**). The reactive schedule's
+two parameters are grid-searched on **days 1–3 only** and frozen for evaluation on the disjoint
+**days 4–7**; no reported number contains calibration data. **Reactive won on the mean
+(−0.0111 vs TWAP's +0.0161) and that result is not resolved** — both carry a standard deviation of
+≈5.2 across the 96 evaluation cells, so a gap of 0.027 is roughly 1/190th of the noise and is
+consistent with chance. What *is* resolved is the variance: **front-loaded pays a higher mean cost
+(+0.1306) with a standard deviation of 0.3404 against ≈5.2 — roughly a 15× dispersion reduction,
+holding for every symbol in the panel.** The mechanism is a straight trade of a deterministic cost
+for a stochastic one: own-impact is charged predictably and front-loading incurs more of it, while
+adverse drift is the dominant noisy term and scales with how long you stay exposed. That is a
+frontier, and which end of it you want is a risk preference this analysis does not take a position
+on. **This is a model-based cost comparison, not a trading recommendation and not a backtest** —
+no queue, no latency, no partial fills, and the replayed flow cannot react to the simulated order,
+an assumption that cuts hardest against precisely the reactive schedule.
+
+[Full results and caveats →](results/q7_execution.md)
+
 ## Reproducing from a fresh clone
 
 ### 1. Environment
@@ -195,14 +261,20 @@ Python 3.12+. Dependencies are polars, numpy, matplotlib, httpx; `uv sync` insta
 ### 2. Verify the code before trusting it
 
 ```bash
-uv run pytest -m "not network" -q     # 90 tests: estimators vs synthetic ground truth
+uv run pytest -m "not network" -q     # 171 tests: estimators vs synthetic ground truth
 uv run ruff check src/ tests/
 ```
 
 The estimators are validated against series with analytically known answers before touching real
 data — i.i.d. signs (ACF exactly 0), a Markov chain (ACF = (2p−1)^k), FARIMA noise (γ = 1 − 2d),
-and a known impact kernel the response estimator must recover. Add `-m network` to also run the
-live smoke test against a real Binance dump file.
+a known impact kernel the response estimator must recover, and a simulated Hawkes process with a
+planted branching ratio the MLE must recover. Two of these tests are the honesty backbone of
+Phase 3: one plants a **regime-switching Poisson process with no self-excitation at all** and
+documents that both branching-ratio estimators report spurious near-criticality on it
+(n̂ = 0.934, α̂ = 0.976), and the other plants a **seasonal-baseline Hawkes process** and shows
+business-time rescaling recovers the true α to within 0.01 where a raw clock-time fit is inflated
+by +0.22 to +0.55. Add `-m network` to also run the live smoke test against a real Binance dump
+file.
 
 ### 3. Download and ingest the data
 
@@ -287,6 +359,34 @@ bounded by the largest single symbol rather than the universe. Symbols below `--
 skipped with a logged reason and any other per-symbol failure is caught and recorded, so neither
 run aborts partway through.
 
+### 6. Run the Phase-3 analyses
+
+Q6 needs monthly 2023-06 `aggTrades` for its panel; it builds the 41-symbol union itself from
+`results/universe_2023-06.txt` plus `results/q4_cross_section.parquet`'s activity column, and
+writes the resolved list to `results/q6_symbols_2023-06.txt`. Q7 needs Q5's kernel file
+(`results/q5_kernel_panel.json`, committed) plus daily `bookTicker` for its 6 chosen symbols over
+2023-06-01..07.
+
+```bash
+# Q6: 41-symbol branching-ratio panel (16-symbol panel ∪ top-40 most active)
+uv run python -m microstructure.analyses.q6_endogeneity \
+    --root data --out results --symbols-file results/panel_2023-06.txt \
+    --month 2023-06 --top-n 40 --windows 6
+
+# Q7: execution-cost comparison, calibrate days 1-3, evaluate days 4-7
+uv run python -m microstructure.analyses.q7_execution \
+    --root data --out results --symbols-file results/panel_2023-06.txt \
+    --kernels results/q5_kernel_panel.json --month 2023-06 \
+    --start-day 2023-06-01 --end-day 2023-06-07 \
+    --horizon-events 2000 --n-children 20
+```
+
+Q6 is the heaviest run in the project: 41 symbols × 6 Nelder-Mead multi-start MLE fits, plus one
+extra raw-clock-time fit per symbol to measure the seasonality bias. Each sub-window is capped at
+250,000 events to bound the per-fit cost. Q7's calibration/evaluation day split is hard-coded to
+the first three and remaining days of the requested range, so shifting `--start-day` /`--end-day`
+shifts both windows together.
+
 ## Repo map
 
 ```
@@ -297,12 +397,16 @@ src/microstructure/
 │   ├── catalog.py      # sync / sync_days, integrity and continuity reports
 │   └── events.py       # aggressor aggregation + the ±1 sign convention
 ├── signals/
-│   └── load.py         # Parquet → analysis frames; strictly-prior mid join
+│   ├── load.py         # Parquet → analysis frames; strictly-prior mid join
+│   └── eventtime.py    # intraday rate profile + business-time rescaling (Phase 3)
 ├── estimators/
 │   ├── acf.py          # FFT sign ACF (Wiener-Khinchin) + log-log power-law fit
 │   ├── response.py     # R(ℓ) = E[s_t · (m_{t+ℓ} − m_t)]
 │   ├── ofi.py          # Cont-Kukanov-Stoikov OFI + through-origin OLS
-│   └── propagator.py   # Toeplitz kernel deconvolution + blocked β̂ uncertainty
+│   ├── propagator.py   # Toeplitz kernel deconvolution + blocked β̂ uncertainty
+│   └── hawkes.py       # Hawkes simulators (incl. seasonal-μ), MLE, count-variance n̂
+├── execution/
+│   └── simulator.py    # replay cost model + TWAP / front-loaded / reactive schedules
 ├── analyses/
 │   ├── q0_aggregation_effect.py # → q0_*.md/.json (Phase 1.5 diagnostic)
 │   ├── q1_orderflow_memory.py   # → q1_*.png/.md/.json
@@ -310,7 +414,9 @@ src/microstructure/
 │   ├── q2_response.py           # → q2_*.png/.md/.json
 │   ├── q3_ofi.py                # → q3_*.png/.md/.json
 │   ├── q4_cross_section.py      # → q4_*.png/.md/.json/.parquet (Phase 2)
-│   └── q5_kernel_panel.py       # → q5_*.png/.md/.json (Phase 2)
+│   ├── q5_kernel_panel.py       # → q5_*.png/.md/.json (Phase 2)
+│   ├── q6_endogeneity.py        # → q6_*.png/.md/.json/.parquet (Phase 3)
+│   └── q7_execution.py          # → q7_*.png/.md/.json (Phase 3)
 └── synthetic.py        # series with KNOWN properties, for estimator validation
 
 tests/                  # pytest; estimators checked against synthetic ground truth
@@ -326,10 +432,22 @@ LEARNING.md             # concepts, judgment calls, and the interview drill
 
 Stated plainly, because they bound every number above:
 
-- **Single regime.** Q1 covers two months; Q2 and Q3 a single 14-day window on one symbol; Q4 a
-  single month and Q5 a single **7-day** window. Phase 1.5 *measured* these statistics to be
-  regime-dependent, so this is a documented risk rather than a hypothetical one. Nothing here
-  establishes that any result generalizes across periods or volatility regimes.
+- **Single regime.** Q1 covers two months; Q2 and Q3 a single 14-day window on one symbol; Q4 and
+  Q6 a single month; Q5 a single **7-day** window and Q7 a **4-day** evaluation window. Phase 1.5
+  *measured* these statistics to be regime-dependent, so this is a documented risk rather than a
+  hypothetical one. Nothing here establishes that any result generalizes across periods or
+  volatility regimes.
+- **Exponential Hawkes kernel only.** Every Q6 branching ratio is a **lower bound**: an
+  exponential kernel truncates long-range excitation a power-law kernel would capture. The
+  one-directional 41/41 disagreement between the MLE and the count-variance estimator (median
+  0.2395) is consistent with that misspecification but is **not attributed** — count-variance
+  window sensitivity is a competing explanation this data cannot exclude. A power-law refit and a
+  window sweep are the two named follow-ups.
+- **Q7 is a cost model, not a market.** No queue position, no latency, no partial fills, linear
+  own-impact extrapolation, and replayed flow that cannot react to the simulated order — the last
+  of which undercuts precisely the flow-reactive schedule it was built to test. The
+  reactive-vs-TWAP mean difference is unresolved against its own noise; only the front-loaded
+  variance reduction is a resolved effect.
 - **Optimistic standard errors.** Every Phase-1 stderr is OLS, which assumes independent
   residuals. ACF values at adjacent lags share nearly all their data, and adjacent bars are
   autocorrelated, so all stated uncertainties are too small. Q4's cross-sectional regressions
@@ -365,16 +483,20 @@ for a project whose goal is learning against published answer keys.
 
 ## Status
 
-Phase 1 (Q1–Q3), Phase 1.5 (Q0, Q1b), Phase 2 (Q4, Q5) and the tick-size confound test (Q4b)
-complete.
+Phase 1 (Q1–Q3), Phase 1.5 (Q0, Q1b), Phase 2 (Q4, Q5), the tick-size confound test (Q4b), and
+Phase 3 (Q6, Q7) complete.
 
-Next, in order of how much it would change the conclusions: **re-running Q4b against mainnet
-exchangeInfo** once network access allows it, to replace the testnet-mirror tick sizes used here
-(activity was found to dominate, tick size a real but minor contributor — see
-[Q4b](results/q4b_tick_confound.md) — but that verdict rests on a documented substitute data
-source); **β fit over disjoint lag windows** to resolve whether Q4's anti-persistence and Q5's
-slow kernels are scale separation or estimator contamination; and a **repeat on a disjoint week
-and month**, since a single window cannot distinguish a law from a June. Still queued from Phase
-1: block-bootstrap intervals on γ̂ and the OFI slope, a Q3 bar-length sweep, and a
-signed-trade-volume comparison against book OFI —
-all using data already on disk.
+Next, in order of how much it would change the conclusions: a **power-law-kernel refit of Q6**,
+which is now the single highest-value follow-up in the project — it would test whether crypto is
+genuinely near-critical, and would simultaneously attribute or dismiss the one-directional 41/41
+estimator disagreement; a **window-sensitivity sweep on the count-variance n̂**, the competing
+explanation for that same gap; **re-running Q4b against mainnet exchangeInfo** once network access
+allows it, to replace the testnet-mirror tick sizes used here (activity was found to dominate,
+tick size a real but minor contributor — see [Q4b](results/q4b_tick_confound.md) — but that
+verdict rests on a documented substitute data source); **β fit over disjoint lag windows** to
+resolve whether Q4's anti-persistence and Q5's slow kernels are scale separation or estimator
+contamination; and a **repeat on a disjoint week and month**, since a single window cannot
+distinguish a law from a June — which is also the first falsifier for the liquidity-invariance
+pattern now visible in both γ̂ (Q4) and α̂ (Q6). Still queued from Phase 1: block-bootstrap
+intervals on γ̂ and the OFI slope, a Q3 bar-length sweep, and a signed-trade-volume comparison
+against book OFI — all using data already on disk.

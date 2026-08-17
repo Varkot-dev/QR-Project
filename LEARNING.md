@@ -3,7 +3,8 @@
 This document explains every concept, every estimator, and every judgment call behind the
 results in `results/`. It is written to be defended out loud. Every number here comes
 from this repository's actual output — `results/q1_results.json`, `q2_results.json`,
-`q3_results.json` for Phase 1, and `q4_cross_section.json`, `q5_kernel_panel.json` for Phase 2 —
+`q3_results.json` for Phase 1, `q4_cross_section.json`, `q5_kernel_panel.json` for Phase 2, and
+`q6_endogeneity.json`, `q7_execution.json` for Phase 3 —
 not from the literature and not from memory. Where a result is uncertain or
 sample-limited, the sentence containing it says so.
 
@@ -17,7 +18,8 @@ Read it alongside the code it describes. Each section names the file it explains
 4. [OFI and linear impact](#4-ofi-and-linear-impact)
 5. [Statistics used honestly](#5-statistics-used-honestly)
 6. [Phase 2: the cross-section and the kernel](#6-phase-2-the-cross-section-and-the-kernel)
-7. [Interview drill](#7-interview-drill)
+7. [Phase 3: self-excitation and execution](#7-phase-3-self-excitation-and-execution)
+8. [Interview drill](#8-interview-drill)
 
 ---
 
@@ -1050,9 +1052,460 @@ with those caveats attached, and it is the only one worth making out loud.
 
 ---
 
-## 7. Interview drill
+## 7. Phase 3: self-excitation and execution
 
-Fourteen questions with answers grounded in this project's actual numbers.
+*Code: `src/microstructure/estimators/hawkes.py`,
+`src/microstructure/signals/eventtime.py`,
+`src/microstructure/execution/simulator.py`,
+`src/microstructure/analyses/q6_endogeneity.py`,
+`src/microstructure/analyses/q7_execution.py`.
+Results: `results/q6_endogeneity.md`, `results/q7_execution.md`.*
+
+Phases 1 and 2 asked what order flow *looks like* — how it decays, how it maps into price.
+Phase 3 asks a different question: **how much of the flow is the market reacting to itself?**
+Then it asks the only question a trader actually cares about: given all this structure, does
+knowing it change what an execution schedule should do?
+
+### 7.1 Self-excitation, the branching ratio, and what 0.707 means
+
+**The popcorn picture.** A Poisson process is a steady patter of rain — each event arrives
+independently of every other, with no memory. Markets are not like that. Trades cluster: a burst,
+then a lull, then another burst. The **Hawkes process** (Hawkes 1971) is the minimal fix. Its
+event rate — the **intensity** λ(t) — jumps up after every event and decays back:
+
+```
+λ(t) = μ + Σ_{t_i < t} φ(t − t_i)
+```
+
+`μ` is the baseline: events arriving "from outside" — news, a fundamental trader deciding to buy.
+`φ(·)` is the **kernel**: how much an event lifts the rate afterward, and for how long. This is
+popcorn, not rain. Each pop jostles its neighbours into popping, so you get bursts and silences
+rather than an even patter. It is also exactly the ETAS model seismologists use for aftershocks —
+a big trade is the mainshock, the algorithmic reactions are the aftershocks.
+
+**The branching ratio is the whole point.** Hawkes & Oakes (1974) showed the model above is
+*exactly equivalent* to a branching process: "immigrant" events arrive from outside at rate μ, and
+each event — immigrant or not — produces a random number of "children", with mean
+
+```
+n = ∫ φ(t) dt        ← the branching ratio
+```
+
+That single number is interpretable in a way almost nothing else in this project is:
+
+- `n` is the **fraction of events that are endogenous** — reactions to other events rather than
+  arrivals from outside. `n = 0.3` means about 30% of activity is the market echoing itself.
+- Total activity is amplified by `1/(1 − n)` relative to the news flow driving it. At `n = 0.7`
+  the market is doing 3.3× the volume the outside world actually justifies.
+- `n → 1` is **criticality**: cascades of unbounded length, endogenous fraction → 100%. Like a
+  reactor where each fission triggers exactly one more.
+- `n ≥ 1` is explosive — non-stationary, activity diverges. (This repo's simulator raises on
+  `alpha ≥ 1` rather than hanging forever in the thinning loop, which is what it did before Task 1's
+  review caught it.)
+
+In this repo's parameterization, `φ(t) = α·β·exp(−βt)`, whose integral is exactly `α` — so
+**alpha *is* the branching ratio**, and the whole of Q6 is a cross-section of one number.
+
+**Our measurement.** Q6 fits the exponential-kernel Hawkes MLE to a **41-symbol** panel of
+2023-06 aggressor flow (the union of the 16-symbol Phase-2 panel and the 40 most-active universe
+symbols; they overlap 15/16, which is why the union is 41 and not ~56). Each symbol's month is
+split into 6 contiguous business-time sub-windows, fit independently, and summarized by the
+median:
+
+| | |
+|---|---|
+| Median α̂ across 41 symbols | **0.707** |
+| Range | **0.370** (KEYUSDT) to **0.879** (LINAUSDT) |
+| Distance from criticality (1 − α̂) | **0.293** |
+| Symbols with α̂ ≥ 0.9 | **0** |
+| Symbols with α̂ ≥ 0.95 | **0** |
+
+Read the headline out loud: **roughly 70% of aggressor events on a typical Binance perp are
+reactions to other aggressor events, not independent arrivals from outside.** The market is
+mostly talking to itself. Only about three trades in ten are "news" in any sense the model can
+see.
+
+That is a high endogeneity level. It is **not** near-critical. Under this kernel, **zero of 41
+symbols** land above 0.9, let alone at the `n ≈ 1` the reflexivity literature argues about. The
+gap between "high" and "critical" is the entire debate, and this panel sits firmly on the "high,
+not critical" side of it — *under an exponential kernel*, which is the caveat the next paragraph
+exists for.
+
+**Engaging the literature honestly.** The reflexivity program runs through two opposed papers.
+Filimonov & Sornette (2012) fit exponential-ish kernels to E-mini S&P and found endogeneity
+rising from ~30% in 1998 to ~70% by 2010, tracking the growth of algorithmic trading — n as an
+instability barometer. Hardiman, Bercot & Bouchaud (2013) refit the same data with **power-law**
+kernels and found `n ≈ 1` in *every* year, 1998–2011: markets "are and always have been"
+near-critical, and the apparent trend was an artifact of short-memory kernels. On crypto
+specifically, **Mark, Šíla & Weber (2022, *European Journal of Finance*)** fit BTC with power-law
+kernels and find a criticality level comparable to fiat FX — reflexivity ports to crypto
+essentially unchanged.
+
+Our 0.707 does **not** contradict that. It is a **lower bound**, and the reason is structural, not
+statistical. An exponential kernel has one timescale and finite memory; if the true kernel is a
+slowly-decaying power law, the exponential fit truncates the long-range excitation it cannot
+represent, and the missing kernel mass shows up as a systematically **understated** branching
+ratio. That is precisely the mechanism Hardiman et al. used to explain away Filimonov &
+Sornette's trend. So the correct sentence is: *this panel measures α̂ ≈ 0.707 under an
+exponential kernel, and a power-law refit would likely push every number in the table upward,
+potentially materially so.* Whether it would push them to 1.0 — whether crypto is near-critical —
+is a question this phase set up but did not answer. Quoting 0.707 as a point estimate comparable
+to the EJF 2022 power-law numbers would be a category error.
+
+**And the panel says endogeneity is liquidity-invariant.** Regressing α̂ on log₁₀(activity)
+across the 41 symbols: slope **+0.0286** (stderr 0.1094), **R² = 0.0017**. The stderr is nearly
+four times the slope. That is not a weak relationship; it is the absence of one, in the same shape
+Q4 found for γ. §7.6 takes that pattern seriously.
+
+### 7.2 The trap, the cure, and why measuring a near-zero correction was not wasted work
+
+This is the part of Phase 3 that generalizes beyond Hawkes.
+
+**The trap.** Filimonov & Sornette (2015) made the sharpest possible criticism of the whole
+program: **`n̂ ≈ 1` can be manufactured from nothing.** Fit a Hawkes model to a process that has
+*no self-excitation whatsoever* — just a Poisson process whose rate switches between two levels on
+a fixed clock — and the estimator reports severe endogeneity. The reason is that a likelihood fit
+cannot distinguish "events cause more events" from "the rate happened to be high just then". Both
+produce clustering. Both look identical in count statistics.
+
+This repo does not take that on faith. `tests/estimators/test_hawkes.py::
+test_regime_switching_poisson_produces_spurious_endogeneity_trap` builds the trap explicitly —
+rate alternating between 0.5 and 2.0 every 5000 seconds, zero self-excitation by construction —
+and measures what our own estimators say about it:
+
+| estimator | reports on a process with true n = 0 |
+|---|---|
+| `branching_count_variance` (model-free) | **n̂ = 0.934** |
+| `fit_hawkes_exp` (MLE) | **α̂ = 0.976** |
+
+Both estimators report near-criticality on a process containing no excitation at all. If we had
+run Q6 on raw clock time and reported "crypto is critical," that table is the entire refutation,
+and it comes from our own code.
+
+**The cure: business time.** The fix is a deterministic time change. Estimate the intraday rate
+profile — a 48-bin, mean-1 histogram of time-of-day activity — and integrate it to define
+
+```
+τ(t) = ∫₀ᵗ rate(s) ds
+```
+
+Under τ, a Poisson process with a seasonal rate `μ̄ · rate(tod(t))` becomes a **homogeneous**
+Poisson process at rate `μ̄` (the standard time-change theorem for point processes). The seasonal
+clustering is flattened out of existence *before* the Hawkes fit ever runs, so whatever excitation
+the fit then finds is not the daily cycle in disguise. `signals/eventtime.py` implements this, and
+Q6 applies it unconditionally, to every symbol, before any fitting.
+
+**Does the cure work?** Measured, not asserted. `tests/signals/test_eventtime.py` simulates a
+Hawkes process with a genuinely seasonal baseline (`simulate_seasonal_hawkes_exp`) at a known
+true α = 0.35, fits it both ways, at two seasonal amplitudes:
+
+| planted seasonal amplitude | raw clock-time α̂ | error | business-time α̂ | error |
+|---|---|---|---|---|
+| 1.4 (shallow trough) | **0.5698** | +0.220 | **0.3406** | −0.009 |
+| 1.05 (deep trough) | **0.8981** | +0.548 | **0.3423** | −0.008 |
+
+Clock time inflates α by +0.22 to +0.55. Business time recovers truth to within 0.01 — errors 6–8×
+smaller than the test's ±0.06 tolerance, and stable at a second seed. The armor works.
+
+**Now the punchline, which is the actually interesting result.** Q6 measures the size of that
+bias on the *real* data too. Each symbol gets one extra fit on raw clock time (`raw_delta =
+α_raw − α_rescaled`), and across the panel:
+
+**Median raw_delta = −0.0003.** Largest magnitude anywhere in the 41 symbols: **0.0484.**
+
+Essentially zero. The correction that saved us from a fake 0.93 on synthetic data changed the real
+answer by three ten-thousandths.
+
+**This is not a wasted effort, and understanding why is the point.** Three things are true at once
+and they do not conflict:
+
+1. The threat is real and severe — 0.934 and 0.976 on a process with no excitation, measured here.
+2. The correction works — +0.22/+0.55 bias removed to within 0.01, measured here.
+3. The threat is small **in this particular market** — median bias −0.0003, measured here.
+
+Point 3 is a *finding about crypto*, not a verdict on the method. Crypto perps trade 24/7. There is
+no open, no close, no lunch lull, no dominant regional session. The 48-bin intraday profile
+recovered from a month of these symbols is close to flat — and a flat profile makes
+`rescale_to_business_time` nearly the identity map, so there is very little seasonal confound left
+to remove. An equity or FX panel would not look like this.
+
+And here is the epistemics that matters: **you cannot know the correction was unnecessary until
+you build it and measure it.** Skipping business time because "crypto is 24/7 so seasonality is
+probably small" is a guess. Building it, validating it against a planted bias, running it on all
+41 symbols, and *measuring* the bias at −0.0003 is knowledge. The correction is applied
+unconditionally in `q6_endogeneity.py` for exactly this reason: not knowing in advance how flat a
+given symbol's profile will be is the argument for correcting always rather than deciding
+per-symbol on a hunch. **The armor was necessary to prove the threat was small here.** That is not
+wasted work — that is how you know.
+
+### 7.3 Two estimators, one disagreement, and why disagreement is information
+
+Q6 runs a second, completely independent branching-ratio estimator alongside the MLE: the
+Hardiman & Bouchaud (2014) **count-variance** estimator. For a stationary Hawkes process, as the
+counting window grows much larger than the kernel timescale,
+
+```
+var(N_W) / mean(N_W) → 1 / (1 − n)²      ⟹      n̂ = 1 − sqrt(mean / var)
+```
+
+Look at what that formula needs: event counts. That is all. **No kernel shape is assumed at all** —
+not exponential, not power law, nothing. Clustering amplifies count variance above the Poisson
+`var = mean` benchmark, and the amplification factor pins down `n`.
+
+Two estimators, two different assumption sets:
+
+| | `fit_hawkes_exp` (MLE) | `branching_count_variance` |
+|---|---|---|
+| assumes kernel shape | **yes** — exponential, one timescale | **no** |
+| assumes stationarity | yes | yes |
+| uses | full event-time likelihood | count mean/variance in windows |
+| main weakness | misspecification if the true kernel is power-law | window-choice sensitivity; large-window asymptotic is approximate at any finite window |
+
+They disagree, and the disagreement is not small:
+
+| | |
+|---|---|
+| Median \|α̂_MLE − n̂_CV\| across 41 symbols | **0.2395** |
+| Pearson correlation between them | **0.2597** |
+| Symbols where n̂_CV > α̂_MLE | **41 of 41 (100%)** |
+| Median n̂_CV | **0.959** vs median α̂_MLE **0.707** |
+
+A median gap of 0.24 on a quantity bounded in [0, 1] is enormous — a third of the usable range.
+A correlation of 0.26 means they barely rank the cross-section the same way. If you wanted a
+comfortable result you would report whichever number suited your thesis, or average them. Neither
+is defensible.
+
+**Why the disagreement is information rather than failure.** The key fact is the *direction*.
+The gap is not noise scattered both ways — it is **one-directional, 41 out of 41 symbols**, with
+count-variance reading higher every single time. Noise does not do that. A systematic,
+unanimous, one-directional gap between two estimators is a **misspecification signal**, and the
+sign points somewhere specific.
+
+Recall §7.1: an exponential kernel truncates power-law memory and therefore **understates** the
+branching ratio. The count-variance estimator assumes no kernel shape at all and is free of that
+particular bias. So "count-variance reads higher than exponential-kernel MLE, on every symbol"
+is *exactly* the pattern you would predict if the true kernel is a slowly-decaying power law. The
+disagreement is not the two estimators failing — it is the two estimators jointly telling us the
+exponential kernel is the wrong model.
+
+**But the honest version does not stop there,** because there is a second explanation that fits
+the same evidence. `branching_count_variance` uses one fixed 200-second (business-time) window per
+symbol, and its own docstring warns that the large-window asymptotic is an approximation at any
+finite window. A window choice that is systematically too small or too large relative to the
+kernel timescale would also produce a systematic gap. This analysis **cannot separate the two**.
+Attribution would need either a power-law-kernel MLE refit or a window-sensitivity sweep on n̂_CV,
+and neither is in this phase. It is logged as a known open item, not resolved.
+
+The takeaway worth carrying into an interview: **when two estimators with different assumptions
+disagree systematically, that is a measurement, not a bug.** It localizes which assumption is
+doing the damage. Papering over it — averaging, or picking the publishable one — throws away the
+single most informative thing the analysis produced.
+
+### 7.4 The thinning-bias episode: what a rejected fix looks like
+
+Like Phase 1's "R is not G" arc (§3), Phase 3 has an episode where the first attempt was wrong in
+an instructive way, and the record is worth keeping.
+
+**The setup.** Task 2 needed a *justification test*: prove that business-time rescaling actually
+recovers the true branching ratio from seasonality-confounded data. That requires simulating a
+Hawkes process with a seasonal baseline. No such simulator existed. The implementer approximated
+one: simulate an ordinary constant-μ Hawkes process, then **thin** the realized events by a
+time-of-day acceptance probability — keep more events during "busy" hours, fewer during "quiet"
+ones. Realized event density then has the right daily shape.
+
+**The problem.** The rescaled fit came in at α̂ ≈ 0.285 against a true 0.35 — outside the
+brief's ±0.06 tolerance. The obvious move is to loosen the tolerance and move on. Instead the
+implementer ran a control: thin the same series **uniformly at random**, at the same overall keep
+fraction, with no seasonality at all. Fitted α dropped to ≈0.25 anyway. That isolates the cause
+completely. **Thinning discards genuinely self-excited children along with baseline events**, and
+a branching ratio estimated from a series with its children randomly deleted is biased downward
+for reasons that have nothing to do with seasonality. The residual was a real, reproducible
+construction bias (sd ≈ 0.001 across five thinning seeds), not seed noise — so the implementer
+loosened the tolerance to ±0.09 and documented exactly why.
+
+**The review.** The reviewer **confirmed the physics** — the diagnosis was correct, the control
+experiment was the right experiment, the bias is real — and **rejected the remedy anyway**.
+The argument: a loosened tolerance is a permanent, silent tax on the test's power. Once you accept
+±0.09 you can no longer detect a rescaling bug that costs you 0.07. The correct move is not to
+widen the goalposts around a broken construction; it is to fix the construction. The reviewer went
+further and prototyped the fix — a genuine seasonal-baseline simulator — measuring 0.011 error and
+demonstrating the tight ±0.06 tolerance was recoverable.
+
+**The fix.** `simulate_seasonal_hawkes_exp` was built into `hawkes.py`: Ogata thinning where the
+*baseline itself* is seasonal (`λ(t) = μ̄·shape(tod(t)) + excitation`), with the thinning bound
+raised to `μ̄·max(shape) + excitation-peak` to stay valid. No events are discarded after the
+fact, so no children go missing. The tolerance went back to ±0.06 and the errors came in at
+−0.009 and −0.008 (§7.2's table). The thinning construction was **kept**, but relabeled: it is now
+`test_thinning_construction_has_documented_downward_bias`, asserting a loose range rather than a
+tolerance, because documenting a known bias and asserting recovery-within-tolerance are different
+claims and should not share a test.
+
+A bonus fell out. The old thinning construction, at deep seasonal troughs, drove the Nelder-Mead
+search into a degenerate optimum — α ≈ 0.98 with β ≈ 0.006, a near-flat "excitation" fitting the
+sparse-then-bursty gaps left by deleted events. The rebuilt simulator at the *same* deep amplitude
+(1.05) produces a large but non-degenerate raw fit (α ≈ 0.898, β staying near the true kernel
+timescale). That is direct evidence the degeneracy was a construction artifact, not an inherent
+property of deep troughs — a fact nobody knew before the rebuild.
+
+**The lesson, stated generally: a correct diagnosis does not license the first remedy that occurs
+to you.** The implementer's analysis was right and the reviewer said so. What got rejected was the
+inference from "this bias is real" to "therefore I should widen my tolerance." A measurement
+apparatus with a known defect should be repaired, not accommodated — and the repair here made two
+tests sharper and surfaced a new fact about the optimizer.
+
+### 7.5 Execution: a risk/cost frontier the data actually resolves
+
+Q7 asks whether any of this structure pays. Three schedules execute the same parent order against
+replayed 2023-06 flow on 6 panel symbols, under one shared cost model
+(`execution/simulator.py`): adverse drift vs. arrival mid, plus half-spread, plus own-impact from
+the symbol's **own measured Q5 kernel**.
+
+- **TWAP** — uniform children on an even event grid. The neutral benchmark.
+- **Front-loaded** — same grid, exponentially decaying sizes; decay set from the symbol's measured
+  kernel half-life. Almgren-Chriss-flavored: get done before the impact you cause decays away.
+- **Flow-reactive** — TWAP's grid, but a child is deferred whenever trailing signed flow opposes
+  the parent beyond a threshold. The Hawkes-motivated schedule: stand aside during hostile bursts.
+
+**Calibration discipline first.** The reactive schedule has two free parameters (lookback,
+pause threshold). They are grid-searched on **days 1–3 only** and then **frozen** for evaluation on
+the disjoint window of **days 4–7**. Not one reported number includes calibration-day data. This
+matters more than it sounds: a reactive schedule tuned and scored on the same days will always
+look good, and the difference between "tuned in-sample" and "held out" is the difference between a
+result and a story. The chosen params were lookback=50, threshold=0.2.
+
+**The evaluation-window results (96 cells each — 6 symbols × 4 days × 2 sides × 2 parent sizes):**
+
+| schedule | mean shortfall | sd | n |
+|---|---|---|---|
+| TWAP | +0.0161 | **5.209** | 96 |
+| front-loaded | **+0.1306** | **0.340** | 96 |
+| flow-reactive | **−0.0111** | **5.271** | 96 |
+
+**The reactive schedule won on the mean — and that result is not resolved.** It came in at
+−0.0111 versus TWAP's +0.0161, a gap of 0.0272. But both distributions carry a standard deviation
+of about **5.2** across cells. The gap is roughly **1/190th** of the noise. A difference that
+small against dispersion that large is entirely consistent with chance; this sample cannot
+distinguish reactive's mean shortfall from TWAP's. The correct statement is "reactive had the
+lower mean in this window," and the correct next sentence is "which does not establish it is
+better." Claiming a Hawkes-informed schedule beats TWAP off this evidence would be exactly the
+kind of thing this project exists to avoid.
+
+**What *is* resolved is the variance.** Front-loading pays a consistently *higher* mean cost
+(+0.1306 — it deliberately eats more own-impact by trading fast) but with a standard deviation of
+**0.340** against ~5.2 for the other two — roughly a **15× reduction in dispersion**, and it holds
+for **every symbol in the panel**, not just the pooled numbers. That is not a noise-scale effect;
+that is the one clearly resolved finding in Q7.
+
+The mechanism is clean and worth being able to state cold: **front-loading trades a known,
+deterministic cost for an unknown, stochastic one.** Own-impact is charged by the model every time,
+predictably, and front-loading incurs more of it by concentrating size. Adverse drift is the
+opposite — it is the dominant and wildly noisy term for schedules that spread execution across the
+full horizon, because the longer you are exposed to the market, the more the price can wander
+against you. Compress the execution window and you shrink your exposure to drift while paying more
+impact. That is not "better." That is **a risk/cost frontier**, and which point on it you want
+depends on a risk preference this analysis deliberately does not take a position on. A desk that
+must hit a benchmark within tight tracking error and a desk optimizing expected cost want opposite
+ends of that table.
+
+**What the simulator does not claim.** This is load-bearing and the results file leads with it:
+
+- **This is not a trading recommendation and not a backtest of a tradable strategy.** It is a
+  model-based cost comparison. The `NO-TRADING-CLAIM` header on `results/q7_execution.md` says so
+  in those words.
+- **Impact is linear.** `temp_impact(q) = G[1]·(q / typical_event_qty)` extrapolates the measured
+  lag-1 kernel linearly in size. The square-root-law literature (Almgren et al. 2005; Bouchaud et
+  al. 2018) finds temporary impact grows *sublinearly* at large child sizes. Q7's children stay at
+  or below a few multiples of typical event size, where linear and sqrt curves are close — so the
+  linearization is a defensible *local* approximation, and nothing more. It is not validated
+  against large-order impact data and must not be extrapolated.
+- **No queue, no latency, no partial fills.** Children execute instantaneously at the prevailing
+  mid plus half-spread. Real execution has queue position, and queue position is often the whole
+  game.
+- **The market does not react to us.** The replayed flow is fixed historical data. Other
+  participants never notice the parent order, never lean against a visible schedule, never adapt.
+  This is the deepest limitation, and it cuts hardest against precisely the reactive schedule —
+  whose entire premise is interacting with flow that, in this simulation, cannot interact back.
+- **Four evaluation days, one regime**, on one panel, in one historical week.
+
+### 7.6 Three liquidity-invariants — offered as a hypothesis, with its falsifiers
+
+Something has now recurred across three phases, and it is worth naming even though it is not a
+result.
+
+| phase | quantity | what it measures | regression on log₁₀(activity) |
+|---|---|---|---|
+| Q4 | **γ̂** | long-memory decay exponent of the sign series | slope **−0.0112**, **R² = 0.0003**, n = 121 |
+| Q6 | **α̂** | Hawkes branching ratio (endogenous fraction) | slope **+0.0286**, **R² = 0.0017**, n = 41 |
+
+Two independent statistics, measured with entirely different estimators (FFT autocorrelation
+power-law fit vs. Hawkes likelihood), on different panels (121 symbols vs. 41), both showing
+essentially **zero** relationship with how much a symbol trades. Both R² values are under 0.2%.
+Meanwhile both quantities vary a great deal *across* symbols — γ̂ from 0.065 to 1.429, α̂ from
+0.370 to 0.879. Symbols differ enormously in these properties; activity predicts none of the
+difference.
+
+**The hypothesis:** these are properties of *how participants behave* — how metaorders get split,
+how strongly traders react to each other — and that behavior is roughly constant across venues of
+wildly different liquidity, because it is set by the trading population and the algorithms it
+runs, not by the depth of any particular book. Contrast this with the quantities that *do* track
+liquidity: Q4's `p_flip` (slope +0.1114, R² = 0.2632) is mechanical lag-1 structure — market
+makers refilling, arbitrageurs leaning against — and it scales sharply with how contested the
+book is. The proposed split is **behavioral statistics are liquidity-invariant; mechanical
+statistics are not.**
+
+**A candidate third invariant that failed, and it is reported because it failed.** Q5's
+`balance_delta` (the departure from critical balance, `β̂ − (1−γ)/2`) was an obvious candidate for
+this pattern. It is not one. Regressed on log₁₀(activity) across Q5's 16 panel symbols: slope
+**−0.124**, **R² = 0.189**, correlation **−0.435**. That is a visible negative relationship —
+weak, on only 16 symbols, but an order of magnitude more structure than γ̂ or α̂ show. And it is
+consistent with §6.3's own observation that all four balance violations are mid-to-high-activity
+symbols. So the pattern is **two invariants, not three**, and the third candidate points the other
+way.
+
+**What would falsify the two-invariant hypothesis** (stating this is the point of offering a
+hypothesis at all):
+
+1. **A wider activity range.** Q4 spans 1.33 decades and Q6's panel is deliberately activity-tilted
+   (it is a union with the *top* 40 symbols). A null slope over a narrow range is weak evidence.
+   Add genuinely illiquid symbols; if γ̂ or α̂ start moving, invariance was a range artifact.
+2. **A power-law-kernel refit of Q6.** §7.1 says α̂ is a lower bound whose tightness depends on how
+   power-law-ish each symbol's true kernel is. If kernel shape *itself* varies with activity, the
+   exponential bias varies with activity too — and a flat α̂-vs-activity line could be a real slope
+   cancelled by a compensating bias gradient. This is the falsifier I would run first, because it
+   attacks the measurement rather than the sample.
+3. **A different month.** Every number above is 2023-06. Phase 1.5 *measured* these statistics to
+   be regime-dependent. An invariance that holds in June and breaks in October is a June fact.
+4. **Non-activity conditioning.** Activity is one axis. If γ̂ or α̂ track volatility, venue tier,
+   or asset category while ignoring activity, "liquidity-invariant" is the wrong description of
+   what is going on.
+
+Until at least (1) and (3) are done, this is a pattern noticed across three phases, offered as a
+hypothesis with named ways to kill it. It is not a law.
+
+### 7.7 What Phase 3 does not establish
+
+- **One month, one week, one regime.** Q6 is 2023-06; Q7 evaluates on four days of it.
+- **Exponential kernel only.** Every α̂ in Q6 is a lower bound (§7.1), and the 41/41
+  estimator disagreement (§7.3) is unattributed between kernel misspecification and window
+  sensitivity.
+- **`converged=True` is weaker than it sounds.** It means Nelder-Mead stopped improving locally —
+  not that μ and α are identified. Near α ≈ 1 the likelihood has a shallow μ–α ridge, so the flag
+  is a weaker signal near the boundary than away from it. `fit_hawkes_exp`'s docstring says this
+  at length.
+- **A 250,000-event/window runtime cap** means the largest windows are fit on a truncated prefix.
+- **The intraday profile is estimated on the same month it corrects**, so genuine self-excitation
+  clustering at a ~30-minute scale could in principle leak into the profile and be removed with
+  the seasonality.
+- **Q7 is a cost model, not a market.** No queue, no latency, no reaction to our own schedule —
+  and the reactive schedule is the one that assumption hurts most.
+- **Q7's reactive-vs-TWAP mean difference is unresolved noise.** Only the front-loaded variance
+  reduction is a resolved effect.
+
+---
+
+## 8. Interview drill
+
+Eighteen questions with answers grounded in this project's actual numbers.
 
 ---
 
@@ -1417,6 +1870,112 @@ separation or estimator contamination.
 
 ---
 
+**15. What's a branching ratio, and what did you measure?**
+
+A Hawkes process models clustered events: the arrival rate jumps after every event and decays
+back, `λ(t) = μ + Σ φ(t − t_i)`. By the Hawkes-Oakes branching equivalence, that is identical to a
+branching process where outside "immigrant" events arrive at rate μ and each event spawns a mean
+of `n = ∫φ` children. So `n` — the branching ratio — is the **fraction of activity that is the
+market reacting to itself**, and total volume is amplified `1/(1−n)` over the news flow driving
+it. `n → 1` is criticality: cascades of unbounded length. In my parameterization
+`φ(t) = αβe^(−βt)`, whose integral is exactly α, so alpha *is* the branching ratio.
+
+I measured it on 41 Binance perps, one month of aggressor flow, six sub-windows per symbol, median
+of the per-window fits. **Median α̂ = 0.707**, range 0.370 to 0.879. So roughly 70% of trades are
+reactions to other trades, and about three in ten are exogenous. That is high endogeneity.
+
+It is not near-critical, and I would say so unprompted: **zero of my 41 symbols exceed 0.9.**
+Distance from criticality is 0.293 at the median. The reflexivity literature argues about whether
+markets sit at `n ≈ 1`; my panel sits well below that — under an exponential kernel, which is the
+caveat that makes question 16 necessary.
+
+---
+
+**16. Why is your n̂ a lower bound?**
+
+Because of the kernel family I chose, not because of sample size.
+
+An exponential kernel has a single timescale and finite memory. If the true kernel is a slowly
+decaying power law — which is what most of the data-driven literature finds — then the exponential
+fit simply cannot represent the long-range excitation, and the kernel mass it cannot represent
+does not go into α. It goes missing. The result is a systematically **understated** branching
+ratio.
+
+This is not my speculation; it is the mechanism at the center of the field's main dispute.
+Filimonov & Sornette (2012) fit short-memory kernels to E-mini and found endogeneity rising from
+~30% to ~70% over a decade. Hardiman, Bercot & Bouchaud (2013) refit the same data with power-law
+kernels and got `n ≈ 1` in *every* year — the trend was an artifact of the kernel. On crypto, Mark,
+Šíla & Weber (2022, *EJF*) fit BTC with power-law kernels and land near fiat-FX criticality levels.
+
+So my 0.707 does not contradict them and is not comparable to them as a point estimate. The honest
+framing is that a power-law refit would push every number in my table upward, potentially
+materially, and whether crypto is genuinely near-critical is a question I set up but did not
+answer. I have a second piece of evidence pointing the same way — see question 17.
+
+---
+
+**17. Your two estimators disagree by 0.24. Is your result broken?**
+
+No — the disagreement is the most informative thing I measured, and I would lead with it rather
+than bury it.
+
+I ran two estimators with different assumption sets. The exponential-kernel MLE uses the full
+event-time likelihood and assumes a kernel shape. The Hardiman-Bouchaud count-variance estimator
+uses only count mean and variance in windows — `n̂ = 1 − sqrt(mean/var)` — and assumes **no kernel
+shape at all**. Median absolute difference across 41 symbols: **0.2395**. Correlation: **0.2597**.
+On a quantity bounded in [0,1], that is a third of the usable range.
+
+The key fact is not the size, it is the **direction**: count-variance reads higher on **41 of 41
+symbols**. One hundred percent, unanimous. Noise does not do that. A systematic one-directional
+gap between two estimators is a misspecification signal, and here it points at a specific
+assumption — the one the MLE makes and the count-variance estimator does not. If the true kernel
+is power-law, the exponential MLE understates α while the model-free estimator does not carry that
+bias. A gap in exactly this direction is what that hypothesis predicts.
+
+What stops me claiming I have proven kernel misspecification: there is a competing explanation
+that fits the same evidence. My count-variance estimate uses one fixed 200-second business-time
+window per symbol, and the estimator's large-window asymptotic is approximate at any finite
+window — a systematically bad window choice would also produce a systematic gap. My data cannot
+separate the two. Resolving it needs a power-law-kernel MLE refit, or a window-sensitivity sweep
+on n̂_CV, and ideally both. I logged it as an open item rather than picking whichever explanation
+sounded better.
+
+The general point: two estimators disagreeing systematically is a *measurement* that localizes
+which assumption is doing damage. Averaging them, or quoting the more publishable one, would throw
+that away.
+
+---
+
+**18. Your reactive schedule won on average. Why don't you claim it's better?**
+
+Because the win is smaller than the noise, and I checked.
+
+Over my held-out evaluation window the flow-reactive schedule had the lowest mean shortfall,
+**−0.0111** against TWAP's **+0.0161** — a gap of 0.0272. But both distributions have a standard
+deviation of about **5.2** across the 96 cells. The gap is roughly 1/190th of the dispersion. This
+sample cannot distinguish those two means. "Reactive had the lower mean in this window" is what
+happened; "reactive is better" is not something my evidence supports, and reporting a
+Hawkes-motivated schedule beating TWAP off a difference that small would be the exact failure mode
+this project is built to avoid.
+
+I would say what *did* resolve. Front-loading paid a **higher** mean cost, +0.1306, with a standard
+deviation of **0.340** against ~5.2 — roughly a **15× variance reduction**, holding for every
+symbol in the panel, not just pooled. That is well outside noise. The mechanism is that
+front-loading swaps a deterministic cost for a stochastic one: own-impact is charged predictably
+every time and front-loading incurs more of it, while adverse drift — the dominant, noisy term —
+scales with how long you stay exposed. Compress the window, shrink the drift exposure, pay more
+impact. That is a risk/cost frontier, not a winner, and which end you want is a risk preference I
+don't take a position on.
+
+Two more things I'd flag unprompted. First, the parameters were grid-searched on days 1–3 and
+frozen for evaluation on days 4–7 — no leakage — which is why I trust the ranking as a description
+even though I can't call the mean gap real. Second, and worse for the reactive schedule
+specifically: my replayed flow is fixed historical data that cannot react to my order. The whole
+premise of a reactive schedule is interacting with flow, and in this simulator the flow can't
+interact back. That assumption cuts hardest against exactly the schedule that looked best.
+
+---
+
 ## Literature
 
 - **Bouchaud, Gefen, Potters & Wyart (2004)**, *Fluctuations and response in financial markets:
@@ -1433,5 +1992,26 @@ separation or estimator contamination.
   crypto, the third candidate explanation for our lower R².
 - **Lillo, Mike & Farmer**; **Tóth et al.** — order-splitting as the standard mechanism behind
   long-memory order flow.
+- **Hawkes (1971)**; **Hawkes & Oakes (1974)** — the self-exciting point process and its branching
+  equivalence, which is what makes the branching ratio `n = ∫φ` interpretable as an endogenous
+  fraction. The basis of §7.1 and `estimators/hawkes.py`.
+- **Filimonov & Sornette (2012)** — reflexivity: fitting Hawkes to E-mini and reading `n` as the
+  endogenous fraction; endogeneity rising with algorithmic trading.
+- **Hardiman, Bercot & Bouchaud (2013)** — the power-law-kernel rebuttal: `n ≈ 1` in every year,
+  the short-memory-kernel trend an artifact. The reason §7.1 reports our 0.707 as a lower bound.
+- **Hardiman & Bouchaud (2014)** — the model-free count-variance branching-ratio estimator,
+  `branching_count_variance`, and the second half of §7.3's disagreement.
+- **Filimonov & Sornette (2015)** — the calibration counterattack: near-critical `n̂` manufactured
+  from a non-self-exciting regime-switching Poisson process. The trap §7.2 reproduces at
+  n̂ = 0.934 / α̂ = 0.976 in this repo's own tests, and the reason business-time rescaling is
+  applied unconditionally.
+- **Mark, Šíla & Weber (2022)**, *Quantifying endogeneity of cryptocurrency markets*
+  (*European Journal of Finance*) — BTC power-law kernels, criticality comparable to fiat FX. The
+  crypto benchmark Q6 engages with, and cannot be directly compared to under an exponential kernel.
+- **Alfonsi & Blanc (2016)** — optimal execution under Hawkes order flow; the "react to the tape"
+  intuition behind Q7's flow-reactive schedule.
+- **Almgren et al. (2005)**; **Bouchaud et al. (2018)**, *Trades, Quotes and Prices* — the
+  square-root impact law, which is why Q7's linear own-impact scaling is flagged as a local
+  approximation valid only at the small child sizes it actually uses.
 
 The full annotated library, including the adversarial novelty verification, is in `research/`.
