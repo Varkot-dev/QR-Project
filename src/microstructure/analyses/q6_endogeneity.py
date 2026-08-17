@@ -455,7 +455,11 @@ def _write_results_md(out_dir: Path, result: dict) -> None:
         "window's events — this bounds the O(N log N) per-fit MLE cost. Per this repo's own "
         "multi-seed synthetic tests, fitted-alpha sampling sd at comparable sample sizes is "
         "~0.004-0.02, so subsampling this large does not materially widen the uncertainty "
-        "already present from having only 6 windows per symbol."
+        "already present from having only 6 windows per symbol. That sd figure was measured "
+        "on well-specified-kernel synthetic data; it bounds sampling noise from the "
+        "truncation itself, not the separate, larger effect of exponential-kernel "
+        "misspecification against a true power-law kernel (see the kernel caveat below), "
+        "which this sd transfer does not speak to."
     )
     lines.append("")
     lines.append(
