@@ -29,7 +29,7 @@ import pytest
 
 from microstructure.analyses.q6_endogeneity import run_q6
 from microstructure.data.catalog import parquet_path
-from microstructure.estimators.hawkes import simulate_hawkes_exp
+from microstructure.estimators.hawkes import simulate_hawkes_exp, simulate_seasonal_hawkes_exp
 
 MU, BETA = 1.0, 2.0
 # t_end tuned so each planted symbol lands roughly in [50_000, 100_000]
@@ -73,6 +73,45 @@ def _write_planted_hawkes_fixture(
     event_ts = [t0 + timedelta(milliseconds=int(ms)) for ms in ts_ms]
     signs = np.where(np.arange(n) % 2 == 0, 1, -1)
     qty = np.full(n, 1.0) + 0.01 * (np.arange(n) % 5)  # alternating-ish qty, all positive
+
+    agg = pl.DataFrame(
+        {
+            "agg_trade_id": np.arange(n),
+            "price": np.full(n, 100.0),
+            "qty": qty,
+            "first_trade_id": np.arange(n),
+            "last_trade_id": np.arange(n),
+            "ts": event_ts,
+            "is_buyer_maker": signs < 0,
+        },
+        schema_overrides={"ts": pl.Datetime("ms", "UTC")},
+    )
+    agg_path = parquet_path(root, symbol, "aggTrades", month)
+    agg_path.parent.mkdir(parents=True, exist_ok=True)
+    agg.write_parquet(agg_path)
+    return n
+
+
+def _write_event_times_fixture(
+    root: Path, symbol: str, times_s: np.ndarray, month: str = "2023-06",
+) -> int:
+    """Write a raw array of event times (float seconds from an arbitrary
+    origin) as an aggTrades-schema parquet, same dedup/nudge/sign/qty
+    convention as `_write_planted_hawkes_fixture` but taking already-
+    simulated times directly (used for the regime-switching/seasonal trap
+    fixture, which is not a plain `simulate_hawkes_exp` output). Returns the
+    final event count actually written (after dedup nudging).
+    """
+    t0 = datetime(2023, 6, 1, 0, 0, 0, tzinfo=UTC)
+    ts_ms = (times_s * 1000.0).astype(np.int64)
+    ts_ms = np.maximum.accumulate(ts_ms)
+    for i in range(1, ts_ms.size):
+        if ts_ms[i] <= ts_ms[i - 1]:
+            ts_ms[i] = ts_ms[i - 1] + 1
+    n = ts_ms.size
+    event_ts = [t0 + timedelta(milliseconds=int(ms)) for ms in ts_ms]
+    signs = np.where(np.arange(n) % 2 == 0, 1, -1)
+    qty = np.full(n, 1.0) + 0.01 * (np.arange(n) % 5)
 
     agg = pl.DataFrame(
         {
@@ -193,3 +232,83 @@ def test_run_q6_records_raw_vs_rescaled_delta(planted_root: Path):
     rec = result["records"][0]
     assert isinstance(rec["raw_delta"], float)
     assert np.isfinite(rec["raw_delta"])
+
+
+def test_run_q6_regime_switching_fixture_flags_inflated_raw_alpha_via_delta(tmp_path: Path):
+    """Plan-mandated regression test (task-3 plan, "regime-switching fixture
+    lands with documented inflated n̂ flagged by the raw-vs-rescaled delta"):
+    a symbol with NO genuine self-excitation (alpha=0) but a strongly
+    seasonal (time-of-day) baseline rate must, when run through the full Q6
+    pipeline end-to-end, show the trap and the fix in the SAME per-symbol
+    record. `simulate_seasonal_hawkes_exp` with alpha=0 (see
+    `tests/estimators/test_hawkes.py::
+    test_regime_switching_poisson_produces_spurious_endogeneity_trap` and
+    `tests/signals/test_eventtime.py`'s justification tests for the
+    mechanism) is the genuine seasonal-baseline generative model this repo
+    settled on -- deliberately amplitude=1.05 (deep trough) so the
+    seasonality-driven inflation is large.
+
+    Q6's own `raw_delta` field is exactly the tool built to flag this: a
+    positive raw_delta (raw clock-time alpha minus business-time-rescaled
+    window-1 alpha) means clock time would have overstated endogeneity
+    relative to the business-time-corrected fit. On a planted-zero-alpha
+    seasonal symbol, raw_delta must be large and positive, and the final
+    business-time-corrected alpha_median must land far below the raw
+    clock-time estimate, near the planted true_alpha=0 -- i.e. the pipeline
+    both manufactures and then substantially corrects the trap.
+    """
+    true_mu_bar, true_alpha, true_beta = 0.4, 0.0, 1.5
+    # 45 days: alpha=0 leaves beta unidentified/degenerate (see
+    # test_hawkes.py's Poisson-refutation docstring), which can push
+    # branching_count_variance's window wide via its median_beta fallback;
+    # a longer horizon keeps the business-time span >= 20x that window.
+    t_end_s = 45 * 24 * 3600.0
+    n_bins = 48
+    bin_centers = (np.arange(n_bins) + 0.5) / n_bins
+    amplitude = 1.05  # deep trough, matches test_eventtime.py's justification case
+    shape = amplitude + np.cos(2 * 2 * np.pi * bin_centers)
+    shape = shape / shape.mean()
+
+    times_s = simulate_seasonal_hawkes_exp(
+        true_mu_bar, true_alpha, true_beta, t_end_s, shape, seed=7
+    )
+    assert times_s.size > 1000, "need enough events for a stable 6-window panel"
+
+    _write_event_times_fixture(tmp_path, "SEASONUSDT", times_s)
+
+    out_dir = tmp_path / "results"
+    result = run_q6(
+        tmp_path, out_dir, symbols=["SEASONUSDT"], month="2023-06", windows=6, top_n=40,
+    )
+
+    by_symbol = {r["symbol"]: r for r in result["records"]}
+    assert "SEASONUSDT" in by_symbol, (
+        f"SEASONUSDT unexpectedly failed: {result['failures']}"
+    )
+    rec = by_symbol["SEASONUSDT"]
+
+    # The trap: naive raw clock-time fitting on a purely seasonal (no
+    # self-excitation) process is spuriously inflated well above true_alpha.
+    assert rec["raw_alpha_window1"] > true_alpha + 0.3, (
+        f"expected seasonality to inflate raw clock-time alpha above "
+        f"{true_alpha + 0.3}, got {rec['raw_alpha_window1']}"
+    )
+
+    # raw_delta = raw - rescaled_window1 must be large and positive: this is
+    # the pipeline's own documented flag for exactly this failure mode.
+    assert rec["raw_delta"] > 0.3, (
+        f"expected raw_delta to flag the inflated raw alpha (>0.3), got "
+        f"{rec['raw_delta']}"
+    )
+
+    # The fix: business-time rescaling recovers alpha_median close to the
+    # planted true_alpha=0, far below the raw clock-time estimate.
+    assert rec["alpha_median"] < rec["raw_alpha_window1"] - 0.3, (
+        f"expected business-time correction to land well below the raw "
+        f"estimate; alpha_median={rec['alpha_median']}, "
+        f"raw_alpha_window1={rec['raw_alpha_window1']}"
+    )
+    assert rec["alpha_median"] < 0.3, (
+        f"expected business-time-corrected alpha_median near true_alpha=0, "
+        f"got {rec['alpha_median']}"
+    )
