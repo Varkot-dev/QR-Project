@@ -1095,8 +1095,9 @@ That single number is interpretable in a way almost nothing else in this project
 
 - `n` is the **fraction of events that are endogenous** — reactions to other events rather than
   arrivals from outside. `n = 0.3` means about 30% of activity is the market echoing itself.
-- Total activity is amplified by `1/(1 − n)` relative to the news flow driving it. At `n = 0.7`
-  the market is doing 3.3× the volume the outside world actually justifies.
+- Total activity is amplified by `1/(1 − n)` relative to the news flow driving it. At a round
+  `n = 0.7` (illustrative, not the panel figure below) the market is doing 3.3× the volume the
+  outside world actually justifies.
 - `n → 1` is **criticality**: cascades of unbounded length, endogenous fraction → 100%. Like a
   reactor where each fission triggers exactly one more.
 - `n ≥ 1` is explosive — non-stationary, activity diverges. (This repo's simulator raises on
@@ -1125,11 +1126,17 @@ reactions to other aggressor events, not independent arrivals from outside.** Th
 mostly talking to itself. Only about three trades in ten are "news" in any sense the model can
 see.
 
-That is a high endogeneity level. It is **not** near-critical. Under this kernel, **zero of 41
-symbols** land above 0.9, let alone at the `n ≈ 1` the reflexivity literature argues about. The
-gap between "high" and "critical" is the entire debate, and this panel sits firmly on the "high,
-not critical" side of it — *under an exponential kernel*, which is the caveat the next paragraph
-exists for.
+That is a high endogeneity level. Whether it is near-critical depends entirely on which estimator
+you ask. Under the exponential-kernel MLE, **zero of 41 symbols** land above 0.9, let alone at the
+`n ≈ 1` the reflexivity literature argues about — that reading says "high, not critical." But the
+model-free count-variance estimator (§7.3) says the opposite: **all 41 of 41 symbols** land above
+0.9 (median 0.959), which reads as squarely near-critical. The two estimators disagree
+one-directionally on every symbol (§7.3), and this project's own honesty doctrine is precisely
+that a criticality verdict must not be asserted off one estimator when the other contradicts it.
+So the correct statement is: this panel does **not** resolve the near-criticality question in
+either direction — it establishes high endogeneity (median ≈0.71–0.96 depending on estimator) and
+leaves "how close to critical" open, pending the power-law refit or window-sensitivity sweep that
+would attribute the gap between the two estimators.
 
 **Engaging the literature honestly.** The reflexivity program runs through two opposed papers.
 Filimonov & Sornette (2012) fit exponential-ish kernels to E-mini S&P and found endogeneity
@@ -1300,6 +1307,11 @@ The takeaway worth carrying into an interview: **when two estimators with differ
 disagree systematically, that is a measurement, not a bug.** It localizes which assumption is
 doing the damage. Papering over it — averaging, or picking the publishable one — throws away the
 single most informative thing the analysis produced.
+
+**This is also why §7.1's "not near-critical" framing needed qualifying.** The MLE's zero-of-41
+above 0.9 and the count-variance estimator's 41-of-41 above 0.9 are the same disagreement viewed
+through the near-criticality threshold specifically. Neither number gets to be *the* answer; the
+honest position is that this panel does not resolve near-criticality either way.
 
 ### 7.4 The thinning-bias episode: what a rejected fix looks like
 
@@ -1884,10 +1896,14 @@ I measured it on 41 Binance perps, one month of aggressor flow, six sub-windows 
 of the per-window fits. **Median α̂ = 0.707**, range 0.370 to 0.879. So roughly 70% of trades are
 reactions to other trades, and about three in ten are exogenous. That is high endogeneity.
 
-It is not near-critical, and I would say so unprompted: **zero of my 41 symbols exceed 0.9.**
-Distance from criticality is 0.293 at the median. The reflexivity literature argues about whether
-markets sit at `n ≈ 1`; my panel sits well below that — under an exponential kernel, which is the
-caveat that makes question 16 necessary.
+Whether it's near-critical, I would not answer unprompted with just this number, and I'd say so:
+under my exponential-kernel MLE, zero of 41 symbols exceed 0.9 (distance from criticality 0.293 at
+the median), which looks like "high, not critical." But I ran a second, model-free estimator on
+the same panel and it says the opposite — every one of the 41 symbols exceeds 0.9 there. The two
+disagree one-directionally on every symbol, which is exactly the situation my own doctrine says
+not to resolve by picking one estimator's verdict. So the honest answer is that this panel
+establishes high endogeneity but leaves near-criticality open — under an exponential kernel, which
+is the caveat that makes question 16 necessary, and the estimator disagreement is question 17.
 
 ---
 

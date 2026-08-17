@@ -198,11 +198,13 @@ arrivals from outside — fit across a **41-symbol** panel of 2023-06 aggressor 
 successful, 0 failed**), six contiguous business-time sub-windows per symbol. **Median α̂ =
 0.7070**, ranging 0.3699 to 0.8790: roughly **70% of aggressor events are reactions to other
 aggressor events**, and total activity is amplified about 3.4× over the exogenous flow driving it.
-It is high endogeneity but **not near-critical — zero of 41 symbols reach α̂ ≥ 0.9**, distance
-from criticality 0.2930 at the median. **That number is a lower bound, and the headline must say
-so:** an exponential kernel truncates the long-range excitation a power-law kernel would capture,
-so a power-law refit would push every number upward — which is exactly the mechanism Hardiman et
-al. (2013) used to overturn Filimonov & Sornette's original reflexivity trend, and why this is not
+It is high endogeneity, and whether it is near-critical depends on which estimator you ask: under
+the exponential-kernel MLE, **zero of 41 symbols reach α̂ ≥ 0.9** (distance from criticality 0.2930
+at the median), but the model-free count-variance estimator below puts **all 41 of 41 symbols**
+above 0.9 (median n̂ ≈ 0.959). **The MLE number is a lower bound, and the headline must say so:**
+an exponential kernel truncates the long-range excitation a power-law kernel would capture, so a
+power-law refit would push every number upward — which is exactly the mechanism Hardiman et al.
+(2013) used to overturn Filimonov & Sornette's original reflexivity trend, and why this is not
 directly comparable to Mark, Šíla & Weber's (2022) power-law crypto estimates. Two further
 results. **Endogeneity is liquidity-invariant**: regressed on log₁₀(activity), slope **+0.0286**
 with stderr 0.1094 and **R² = 0.0017** — the stderr is four times the slope. And the **two
@@ -210,7 +212,8 @@ estimators disagree, one-directionally, on every symbol**: median |α̂_MLE − 
 **0.2395** (correlation 0.2597), with count-variance reading higher on **41 of 41**. Unanimity is
 not noise; it is a misspecification signal pointing at the exponential kernel — though window
 sensitivity in the count-variance estimator is a competing explanation this data cannot rule out.
-Reported side by side rather than averaged.
+Reported side by side rather than averaged, and the panel therefore does **not** resolve whether
+crypto is near-critical in either direction.
 
 Separately, the seasonality correction this whole analysis is built on was **measured, not
 assumed**: on a regime-switching Poisson process with *no* self-excitation at all, this repo's own
